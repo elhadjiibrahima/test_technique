@@ -1,10 +1,16 @@
 package main
 
-import "net/http"
-
-
+import (
+	"net/http"
+	"os"
+)
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	initDB()
 	defer db.Close()
 
@@ -13,6 +19,6 @@ func main() {
 	http.HandleFunc("GET /requests", listRequests)
 	http.HandleFunc("PATCH /requests/{id}", updateStatus)
 
-	println("Serveur sur http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	println("Serveur sur le port " + port)
+	http.ListenAndServe(":"+port, nil)
 }
