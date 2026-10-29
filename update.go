@@ -11,7 +11,9 @@ import (
 func updateStatus(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "id invalide", http.StatusBadRequest)
+		writeErrors(w, http.StatusBadRequest, map[string]string{
+			"general": "Numéro de demande invalide.",
+		})
 		return
 	}
 
@@ -19,11 +21,15 @@ func updateStatus(w http.ResponseWriter, r *http.Request) {
 		Status Status `json:"status"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "JSON invalide", http.StatusBadRequest)
+		writeErrors(w, http.StatusBadRequest, map[string]string{
+			"general": "Les données envoyées sont invalides.",
+		})
 		return
 	}
 	if !body.Status.valid() {
-		http.Error(w, "status doit être open, in_progress ou done", http.StatusBadRequest)
+		writeErrors(w, http.StatusBadRequest, map[string]string{
+			"general": "Statut invalide : choisissez ouverte, en cours ou terminée.",
+		})
 		return
 	}
 
@@ -32,11 +38,15 @@ func updateStatus(w http.ResponseWriter, r *http.Request) {
 		body.Status, time.Now(), id,
 	)
 	if err != nil {
-		http.Error(w, "erreur base de données", http.StatusInternalServerError)
+		writeErrors(w, http.StatusInternalServerError, map[string]string{
+			"general": "Erreur du serveur : le statut n'a pas pu être modifié.",
+		})
 		return
 	}
 	if n, _ := result.RowsAffected(); n == 0 {
-		http.Error(w, "demande introuvable", http.StatusNotFound)
+		writeErrors(w, http.StatusNotFound, map[string]string{
+			"general": "Cette demande n'existe pas (elle a peut-être été supprimée).",
+		})
 		return
 	}
 

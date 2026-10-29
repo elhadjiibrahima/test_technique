@@ -1,24 +1,21 @@
 package main
 
-import (
-	"net/http"
-	"os"
-)
+import "net/http"
+
+// routes déclare toutes les routes (séparé de main pour pouvoir les tester)
+func routes() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", homePage)
+	mux.HandleFunc("POST /requests", createRequest)
+	mux.HandleFunc("GET /requests", listRequests)
+	mux.HandleFunc("PATCH /requests/{id}", updateStatus)
+	return mux
+}
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	initDB()
 	defer db.Close()
 
-	http.HandleFunc("GET /{$}", homePage)
-	http.HandleFunc("POST /requests", createRequest)
-	http.HandleFunc("GET /requests", listRequests)
-	http.HandleFunc("PATCH /requests/{id}", updateStatus)
-
-	println("Serveur sur le port " + port)
-	http.ListenAndServe(":"+port, nil)
+	println("Serveur sur http://localhost:8080")
+	http.ListenAndServe(":8080", routes())
 }

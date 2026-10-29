@@ -10,11 +10,15 @@ import (
 func createRequest(w http.ResponseWriter, r *http.Request) {
 	var req Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "JSON invalide", http.StatusBadRequest)
+		writeErrors(w, http.StatusBadRequest, map[string]string{
+			"general": "Les données envoyées sont invalides.",
+		})
 		return
 	}
-	if req.Title == "" || req.Requester == "" {
-		http.Error(w, "title et requester obligatoires", http.StatusBadRequest)
+
+	// Contrôle de saisie : un message par champ en erreur
+	if errs := cleanAndValidate(&req); len(errs) > 0 {
+		writeErrors(w, http.StatusBadRequest, errs)
 		return
 	}
 
@@ -28,7 +32,9 @@ func createRequest(w http.ResponseWriter, r *http.Request) {
 		req.Title, req.Description, req.Requester, req.Status, req.CreatedAt, req.UpdatedAt,
 	)
 	if err != nil {
-		http.Error(w, "erreur base de données", http.StatusInternalServerError)
+		writeErrors(w, http.StatusInternalServerError, map[string]string{
+			"general": "Erreur du serveur : la demande n'a pas pu être enregistrée.",
+		})
 		return
 	}
 	id, _ := result.LastInsertId()
