@@ -28,7 +28,7 @@ func notify(userID int, requestID *int, message string) {
 
 // notifyProcessors prévient tous les agents et admins, sauf l'auteur de l'action
 func notifyProcessors(exceptID int, requestID *int, message string) {
-	rows, err := db.Query(`SELECT id FROM users WHERE role IN (?, ?) AND id != ?`,
+	rows, err := db.Query(`SELECT id FROM users WHERE role IN (?, ?) AND id != ? AND active = 1`,
 		RoleAgent, RoleAdmin, exceptID)
 	if err != nil {
 		log.Println("notification non envoyée :", err)

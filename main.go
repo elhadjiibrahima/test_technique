@@ -26,10 +26,14 @@ func routes() http.Handler {
 	mux.HandleFunc("POST /requests", requireAuth(createRequest))
 	mux.HandleFunc("GET /requests", requireAuth(listRequests))
 	mux.HandleFunc("GET /requests/stats", requireAuth(requestStats))
+	mux.HandleFunc("GET /requests/export.csv", requireAuth(exportRequests))
+	mux.HandleFunc("GET /stats/dashboard", requireAuth(dashboard, RoleAdmin))
 	mux.HandleFunc("PUT /requests/{id}", requireAuth(editRequest))
 	mux.HandleFunc("DELETE /requests/{id}", requireAuth(deleteRequest))
 	mux.HandleFunc("PATCH /requests/{id}", requireAuth(updateStatus, RoleAgent, RoleAdmin))
 	mux.HandleFunc("PATCH /requests/{id}/assign", requireAuth(assignRequest, RoleAgent, RoleAdmin))
+	mux.HandleFunc("POST /requests/{id}/reopen", requireAuth(reopenRequest))
+	mux.HandleFunc("POST /requests/{id}/rating", requireAuth(rateRequest))
 
 	// Réponses sur une demande (admin, agents, et le demandeur)
 	mux.HandleFunc("GET /requests/{id}/comments", requireAuth(listComments))
@@ -52,6 +56,8 @@ func routes() http.Handler {
 	mux.HandleFunc("PATCH /users/{id}", requireAuth(updateUserRole, RoleAdmin))
 	mux.HandleFunc("DELETE /users/{id}", requireAuth(deleteUser, RoleAdmin))
 	mux.HandleFunc("POST /users/{id}/reset-link", requireAuth(createResetLink, RoleAdmin))
+	mux.HandleFunc("PUT /users/{id}", requireAuth(adminUpdateUser, RoleAdmin))
+	mux.HandleFunc("PATCH /users/{id}/active", requireAuth(setUserActive, RoleAdmin))
 
 	return securityHeaders(csrfGuard(mux))
 }

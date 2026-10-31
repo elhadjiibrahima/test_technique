@@ -2,8 +2,10 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -27,43 +29,27 @@ func whereSQL(where []string) string {
 	return " WHERE " + strings.Join(where, " AND ")
 }
 
-// GET /requests : lister les demandes visibles (les plus récentes en premier)
-//
-// Pagination (optionnelle) : ?page=2&limit=10
-// Filtres (optionnels)     : ?status=open  ?assignee=me  ?assignee=none
-//
-//	?priority=urgent  ?category=informatique
-//
-// Tri (optionnel)           : ?sort=priority (urgentes d'abord) ou ?sort=recent
-//
-// Le corps de la réponse reste une liste JSON. Le nombre total de demandes
-// (avec les filtres) est envoyé dans l'en-tête X-Total-Count.
-// Sans "page" ni "limit", toutes les demandes sont renvoyées.
-func listRequests(w http.ResponseWriter, r *http.Request, u User) {
-	q := r.URL.Query()
-	where, args := visibleScope(u)
+// requestFilters traduit les paramètres de l'URL en conditions SQL.
+// Utilisé par la liste et par l'export CSV, pour qu'ils montrent les mêmes demandes.
+// Si un paramètre est invalide, errMsg explique pourquoi.
+func requestFilters(u User, q url.Values) (where []string, args []any, order string, errMsg string) {
+	where, args = visibleScope(u)
 
 	if s := q.Get("status"); s != "" {
 		if !Status(s).valid() {
-			writeErrors(w, http.StatusBadRequest, map[string]string{
-				"general": "Statut invalide : choisissez ouverte, en cours ou terminée.",
-			})
-			return
+			return nil, nil, "", "Statut invalide : choisissez ouverte, en cours ou terminée."
 		}
 		where, args = append(where, "r.status = ?"), append(args, s)
 	}
-
 	if p := q.Get("priority"); p != "" {
 		if !Priority(p).valid() {
-			writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Priorité invalide."})
-			return
+			return nil, nil, "", "Priorité invalide."
 		}
 		where, args = append(where, "r.priority = ?"), append(args, p)
 	}
 	if c := q.Get("category"); c != "" {
 		if !Category(c).valid() {
-			writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Catégorie invalide."})
-			return
+			return nil, nil, "", "Catégorie invalide."
 		}
 		where, args = append(where, "r.category = ?"), append(args, c)
 	}
@@ -75,26 +61,64 @@ func listRequests(w http.ResponseWriter, r *http.Request, u User) {
 	case "none":
 		where = append(where, "r.assignee_id IS NULL")
 	default:
-		writeErrors(w, http.StatusBadRequest, map[string]string{
-			"general": "Le filtre assignee doit valoir me ou none.",
-		})
-		return
+		return nil, nil, "", "Le filtre assignee doit valoir me ou none."
 	}
 
-	var total int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM requests r`+whereSQL(where), args...).Scan(&total); err != nil {
-		serverError(w)
-		return
+	// Recherche par mot-clé : titre, description, demandeur et réponses.
+	// « #12 » ou « 12 » trouve aussi la demande numéro 12.
+	if text := strings.TrimSpace(q.Get("q")); text != "" {
+		if utf8.RuneCountInString(text) > 100 {
+			return nil, nil, "", "La recherche est trop longue (100 caractères maximum)."
+		}
+		like := "%" + escapeLike(text) + "%"
+		cond := `(r.title LIKE ? ESCAPE '\' OR r.description LIKE ? ESCAPE '\' OR r.requester LIKE ? ESCAPE '\'
+			OR EXISTS (SELECT 1 FROM comments c WHERE c.request_id = r.id AND c.message LIKE ? ESCAPE '\')`
+		args = append(args, like, like, like, like)
+		if n, err := strconv.Atoi(strings.TrimPrefix(text, "#")); err == nil {
+			cond += ` OR r.id = ?`
+			args = append(args, n)
+		}
+		where = append(where, cond+")")
 	}
 
-	order := ` ORDER BY r.id DESC`
+	order = ` ORDER BY r.id DESC`
 	switch q.Get("sort") {
 	case "", "recent":
 	case "priority":
 		// les urgentes d'abord, puis les plus récentes
 		order = ` ORDER BY CASE r.priority WHEN 'urgent' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, r.id DESC`
 	default:
-		writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Le tri doit valoir recent ou priority."})
+		return nil, nil, "", "Le tri doit valoir recent ou priority."
+	}
+	return where, args, order, ""
+}
+
+// escapeLike protège les caractères spéciaux de LIKE (% et _)
+func escapeLike(text string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(text)
+}
+
+// GET /requests : lister les demandes visibles (les plus récentes en premier)
+//
+//	Pagination : ?page=2&limit=10
+//	Filtres    : ?status=open  ?assignee=me|none  ?priority=urgent  ?category=informatique
+//	Recherche  : ?q=imprimante
+//	Tri        : ?sort=priority (urgentes d'abord) ou ?sort=recent
+//
+// Le corps de la réponse reste une liste JSON. Le nombre total de demandes
+// (avec les filtres) est envoyé dans l'en-tête X-Total-Count.
+// Sans "page" ni "limit", toutes les demandes sont renvoyées.
+func listRequests(w http.ResponseWriter, r *http.Request, u User) {
+	q := r.URL.Query()
+	where, args, order, errMsg := requestFilters(u, q)
+	if errMsg != "" {
+		writeErrors(w, http.StatusBadRequest, map[string]string{"general": errMsg})
+		return
+	}
+
+	var total int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM requests r`+whereSQL(where), args...).Scan(&total); err != nil {
+		serverError(w)
 		return
 	}
 

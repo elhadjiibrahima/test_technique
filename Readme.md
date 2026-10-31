@@ -13,7 +13,9 @@ Avec la page web, on peut :
 - joindre des photos ou des PDF (📎) et voir l'historique complet (🕓) de chaque demande
 - en cas de mot de passe oublié, recevoir un lien de réinitialisation de l'admin
 - pour les agents : prendre en charge une demande, changer son statut, la libérer
-- pour les admins : assigner les demandes, gérer les comptes et les rôles
+- pour les admins : assigner les demandes, gérer les comptes (modifier, désactiver, rôles) et suivre le tableau de bord
+- noter le traitement d'une demande terminée (1 à 5 ⭐), ou la rouvrir si le problème revient
+- rechercher par mot-clé et exporter la liste en CSV (Excel)
 - filtrer la liste (statut, priorité, catégorie, « mes demandes à traiter », « non assignées »),
   trier les urgentes d'abord, et la parcourir page par page
 
@@ -31,6 +33,11 @@ Avec la page web, on peut :
 | Supprimer une pièce jointe | celles qu'il a ajoutées | celles qu'il a ajoutées | ✅ |
 | Changer la priorité | à la création, puis tant que personne ne l'a prise | si elle est libre ou à lui | ✅ |
 | Générer un lien de réinitialisation de mot de passe | ❌ | ❌ | ✅ |
+| Noter une demande terminée | la sienne | ❌ | ❌ |
+| Rouvrir une demande terminée | la sienne | ❌ | ✅ |
+| Exporter en CSV | ses demandes | toutes | toutes |
+| Modifier la fiche d'un utilisateur, désactiver un compte | ❌ | ❌ | ✅ |
+| Tableau de bord | ❌ | ❌ | ✅ |
 | Assigner une demande à un agent | ❌ | ❌ | ✅ |
 | Gérer les comptes et les rôles | ❌ | ❌ | ✅ |
 
@@ -54,6 +61,26 @@ Le poste et le téléphone du demandeur s'affichent sur ses demandes pour les ag
 - **Pièces jointes** : images (PNG, JPEG, GIF, WebP) et PDF, 5 Mo maximum, 5 fichiers par demande.
   Le type est vérifié à partir du contenu du fichier, pas de son nom. Les images s'affichent, les PDF se téléchargent.
   Les fichiers sont stockés dans la base SQLite.
+
+## Suivi de la qualité
+
+- **Note** : quand sa demande est terminée, le demandeur la note de 1 à 5 étoiles, avec un commentaire s'il veut.
+  L'agent qui l'a traitée est prévenu.
+- **Rouvrir** : si le problème revient, le demandeur (ou un admin) rouvre la demande en expliquant pourquoi.
+  Le message est ajouté aux réponses, la demande repart « en cours » chez le même agent, et la note est effacée.
+- **Tableau de bord** (admin) : demandes à traiter, sans agent, urgentes, délai moyen de traitement,
+  satisfaction moyenne, demandes créées et terminées par semaine (8 semaines), répartition par catégorie et
+  par priorité, et activité de chaque agent (en cours, terminées, délai moyen, note moyenne).
+- **Recherche** : dans le titre, la description, le nom du demandeur et les réponses ; « #12 » trouve la demande 12.
+- **Export CSV** : le bouton ⬇️ Exporter télécharge les demandes affichées (avec les mêmes filtres et la même
+  recherche), au format attendu par Excel en français (séparateur « ; », accents et virgule décimale).
+
+## Gestion des comptes
+
+L'admin peut **modifier la fiche** d'un utilisateur (nom, poste, e-mail de connexion, téléphone, adresse) :
+l'utilisateur est prévenu. Il peut aussi **désactiver** un compte, par exemple quand quelqu'un quitte l'entreprise :
+la personne ne peut plus se connecter, ses sessions sont fermées et ses demandes en cours sont libérées,
+mais ses demandes, ses réponses et l'historique sont gardés. Un compte désactivé peut être réactivé.
 
 ## Mot de passe oublié
 
@@ -111,6 +138,9 @@ go test -v ./...
 - `attachments.go` : les pièces jointes
 - `reset.go` : mot de passe oublié et liens de réinitialisation
 - `profile.go` : le profil (poste, téléphone, adresse) et leur contrôle de saisie
+- `feedback.go` : rouvrir et noter une demande
+- `export.go` : l'export CSV
+- `dashboard.go` : les chiffres du tableau de bord
 - `model.go` : les structures (demande, utilisateur), les statuts et les rôles
 - `database.go` : la connexion à la base SQLite et la création des tables
 - `create.go` : ajouter une demande
@@ -143,11 +173,15 @@ Demandes (il faut être connecté) :
   - `?assignee=me` ou `?assignee=none` : mes demandes à traiter, ou les non assignées
   - `?priority=urgent` et `?category=informatique` : filtres
   - `?sort=priority` : les urgentes d'abord
+  - `?q=imprimante` : recherche par mot-clé
 - `GET /requests/stats` : le nombre de demandes par statut
 - `PUT /requests/{id}` : modifier le titre et la description
 - `DELETE /requests/{id}` : supprimer une demande
 - `PATCH /requests/{id}` : changer le statut et/ou la priorité (agent, admin)
 - `PATCH /requests/{id}/assign` : assigner ou libérer une demande (agent, admin)
+- `POST /requests/{id}/reopen` : rouvrir une demande terminée (`message` obligatoire)
+- `POST /requests/{id}/rating` : noter une demande terminée (`rating` de 1 à 5, `comment` optionnel)
+- `GET /requests/export.csv` : exporter en CSV (mêmes filtres que `GET /requests`)
 - `GET /requests/{id}/comments` : le fil des réponses d'une demande
 - `POST /requests/{id}/comments` : répondre (admin, agent, ou le demandeur)
 - `GET /requests/{id}/history` : l'historique de la demande
@@ -166,6 +200,11 @@ Utilisateurs (admin) :
 - `PATCH /users/{id}` : changer le rôle
 - `DELETE /users/{id}` : supprimer un compte (ses demandes sont gardées)
 - `POST /users/{id}/reset-link` : générer un lien de réinitialisation du mot de passe
+- `PUT /users/{id}` : modifier la fiche d'un utilisateur
+- `PATCH /users/{id}/active` : désactiver (`{"active": false}`) ou réactiver un compte
+
+Tableau de bord (admin) :
+- `GET /stats/dashboard` : tous les chiffres du tableau de bord
 
 ## Sécurité
 
@@ -177,6 +216,8 @@ Utilisateurs (admin) :
 - un admin ne peut pas se retirer ses propres droits ni supprimer son propre compte
 - les pièces jointes sont servies avec une politique de sécurité (`Content-Security-Policy: sandbox`) qui empêche tout script de s'exécuter
 - les liens de réinitialisation sont aléatoires (256 bits), valables 24 h, à usage unique, et seule leur empreinte est stockée
+- l'export CSV neutralise les cellules qui commencent par = + - @ (injection de formules dans Excel)
+- un compte désactivé ne peut plus se connecter, et le message ne s'affiche qu'avec le bon mot de passe
 
 ## Les tests
 
@@ -195,6 +236,11 @@ J'ai fait des tests automatiques pour vérifier, entre autres, que :
 - les pièces jointes refusent les faux types, les fichiers vides ou trop gros, et sont protégées comme les demandes
 - le lien de réinitialisation marche une seule fois, expire, et ferme les anciennes sessions
 - le poste est obligatoire à l'inscription ; le profil valide le téléphone et l'adresse, et ne permet pas de changer son rôle ou son e-mail
+- l'admin modifie une fiche (e-mail unique) ; un compte désactivé ne peut plus se connecter, n'est plus notifié ni assignable
+- rouvrir et noter : seulement une demande terminée, par les bonnes personnes ; rouvrir efface la note
+- la recherche trouve dans les réponses et par numéro, traite % comme un caractère normal, et respecte la visibilité
+- l'export CSV respecte les filtres et la visibilité, et neutralise les formules
+- les chiffres du tableau de bord (délai moyen, satisfaction, semaines, agents) sont justes
 - la pagination et les filtres marchent, et refusent les mauvais paramètres
 
 Pour les tests, j'utilise une base de données en mémoire. Comme ça, mes vraies données ne sont pas touchées.
@@ -221,4 +267,3 @@ J'ai pris le pilote `modernc.org/sqlite` parce qu'il marche sans installer de co
   (comptes et demandes compris, sauf le compte admin recréé au démarrage). Il faudrait un disque persistant avec `DB_PATH`, ou passer à PostgreSQL.
 - envoyer aussi les notifications par e-mail, et le lien de réinitialisation automatiquement
 - stocker les pièces jointes hors de la base (par exemple dans un service de stockage de fichiers) si elles deviennent nombreuses
-- une recherche par mot-clé et un tableau de bord de statistiques pour l'admin

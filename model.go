@@ -52,35 +52,39 @@ type User struct {
 	JobTitle  string    `json:"job_title"` // poste occupé, ex : « Comptable »
 	Phone     string    `json:"phone"`
 	Address   string    `json:"address"`
+	Active    bool      `json:"active"` // false = compte désactivé (connexion impossible)
 }
 
 // Colonnes lues pour un utilisateur (jamais password_hash)
-const userColumns = `id, name, email, role, created_at, job_title, phone, address`
+const userColumns = `id, name, email, role, created_at, job_title, phone, address, active`
 
 // scanUser lit une ligne produite avec userColumns
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var u User
-	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt, &u.JobTitle, &u.Phone, &u.Address)
+	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt, &u.JobTitle, &u.Phone, &u.Address, &u.Active)
 	return u, err
 }
 
 type Request struct {
-	ID           int       `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	Requester    string    `json:"requester"`
-	RequesterID  *int      `json:"requester_id"`
-	RequesterJob *string   `json:"requester_job_title"` // poste du demandeur
-	RequesterTel *string   `json:"requester_phone"`     // téléphone du demandeur
-	AssigneeID   *int      `json:"assignee_id"`
-	AssigneeName *string   `json:"assignee_name"`
-	Status       Status    `json:"status"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Priority     Priority  `json:"priority"`
-	Category     Category  `json:"category"`
-	CommentCount int       `json:"comment_count"`    // nombre de réponses
-	FileCount    int       `json:"attachment_count"` // nombre de pièces jointes
+	ID           int        `json:"id"`
+	Title        string     `json:"title"`
+	Description  string     `json:"description"`
+	Requester    string     `json:"requester"`
+	RequesterID  *int       `json:"requester_id"`
+	RequesterJob *string    `json:"requester_job_title"` // poste du demandeur
+	RequesterTel *string    `json:"requester_phone"`     // téléphone du demandeur
+	AssigneeID   *int       `json:"assignee_id"`
+	AssigneeName *string    `json:"assignee_name"`
+	Status       Status     `json:"status"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	Priority     Priority   `json:"priority"`
+	Category     Category   `json:"category"`
+	CommentCount int        `json:"comment_count"`    // nombre de réponses
+	FileCount    int        `json:"attachment_count"` // nombre de pièces jointes
+	ResolvedAt   *time.Time `json:"resolved_at"`      // date du passage à « terminée »
+	Rating       *int       `json:"rating"`           // note du demandeur, de 1 à 5
+	RatingNote   string     `json:"rating_comment"`   // commentaire avec la note
 }
 
 // Priority : l'urgence d'une demande

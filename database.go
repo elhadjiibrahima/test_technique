@@ -108,6 +108,10 @@ var migrations = []string{
 	`ALTER TABLE users ADD COLUMN job_title TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN address TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1`,
+	`ALTER TABLE requests ADD COLUMN resolved_at TIMESTAMP`,
+	`ALTER TABLE requests ADD COLUMN rating INTEGER`,
+	`ALTER TABLE requests ADD COLUMN rating_comment TEXT NOT NULL DEFAULT ''`,
 }
 
 // initDB ouvre la base et crée les tables si elles n'existent pas.

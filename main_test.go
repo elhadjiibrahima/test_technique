@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -882,5 +883,273 @@ func TestProfil(t *testing.T) {
 		if usr.ID == e.aliceID && (usr.Phone != "620123456" || usr.JobTitle != "Comptable") {
 			t.Errorf("liste admin : %+v", usr)
 		}
+	}
+}
+
+// ---------- Fiche utilisateur et désactivation (admin) ----------
+
+func TestAdminModifieUnUtilisateur(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Clavier")
+	url := "/users/" + itoa(e.aliceID)
+
+	e.agent.expect(http.StatusForbidden, "PUT", url, `{"name":"X","job_title":"Y","email":"x@test.gn"}`)
+	u := decode[User](t, e.admin.expect(http.StatusOK, "PUT", url,
+		`{"name":"Alice Bah","job_title":"Directrice","email":" Alice.Bah@Test.gn ","phone":"+224 620 00 00 01","address":"Dixinn"}`))
+	if u.Name != "Alice Bah" || u.Email != "alice.bah@test.gn" || u.JobTitle != "Directrice" || u.Phone != "+224 620 00 00 01" || u.Role != RoleEmploye {
+		t.Errorf("fiche : %+v", u)
+	}
+	if r, _ := getRequest(id); r.Requester != "Alice Bah" {
+		t.Errorf("le nom doit suivre sur les demandes : %q", r.Requester)
+	}
+	// Alice est prévenue et se connecte avec son nouvel e-mail
+	n := decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.alice.expect(http.StatusOK, "GET", "/notifications", ""))
+	if !strings.Contains(n.Items[0].Message, "alice.bah@test.gn") {
+		t.Errorf("notification : %+v", n.Items)
+	}
+	c := &client{t: t, h: e.h}
+	c.expect(http.StatusOK, "POST", "/auth/login", `{"email":"alice.bah@test.gn","password":"motdepasse"}`)
+
+	e.admin.expect(http.StatusConflict, "PUT", url, `{"name":"Alice","job_title":"Directrice","email":"bob@test.gn"}`)
+	e.admin.expect(http.StatusBadRequest, "PUT", url, `{"name":"Alice","job_title":"","email":"alice@test.gn"}`)
+	e.admin.expect(http.StatusBadRequest, "PUT", url, `{"name":"Alice","job_title":"Directrice","email":"pas-un-email"}`)
+	e.admin.expect(http.StatusNotFound, "PUT", "/users/999", `{"name":"Alice","job_title":"Directrice","email":"z@test.gn"}`)
+}
+
+func TestDesactiverUnCompte(t *testing.T) {
+	e := setup(t)
+	id := create(e.bob, "Ecran")
+	e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(id), `{"status":"in_progress"}`)
+	url := "/users/" + itoa(e.agentID) + "/active"
+
+	e.agent.expect(http.StatusForbidden, "PATCH", url, `{"active":false}`)
+	e.admin.expect(http.StatusBadRequest, "PATCH", url, `{}`)
+	u := decode[User](t, e.admin.expect(http.StatusOK, "PATCH", url, `{"active":false}`))
+	if u.Active {
+		t.Error("le compte devrait être désactivé")
+	}
+
+	// Session fermée, connexion refusée (avec un message clair), demandes libérées
+	e.agent.expect(http.StatusUnauthorized, "GET", "/requests", "")
+	c := &client{t: t, h: e.h}
+	rec := c.expect(http.StatusForbidden, "POST", "/auth/login", `{"email":"agent@test.gn","password":"motdepasse"}`)
+	if !strings.Contains(rec.Body.String(), "désactivé") {
+		t.Errorf("message : %s", rec.Body)
+	}
+	c.expect(http.StatusUnauthorized, "POST", "/auth/login", `{"email":"agent@test.gn","password":"mauvais!!"}`) // ne révèle rien sans le bon mot de passe
+	if r, _ := getRequest(id); r.AssigneeID != nil {
+		t.Error("la demande devrait être libérée")
+	}
+
+	// On ne peut plus lui assigner de demande, il ne reçoit plus de notifications
+	e.admin.expect(http.StatusBadRequest, "PATCH", "/requests/"+itoa(id)+"/assign", `{"assignee_id":`+itoa(e.agentID)+`}`)
+	create(e.bob, "Souris")
+	var unread int
+	db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE user_id = ? AND message LIKE '%Souris%'`, e.agentID).Scan(&unread)
+	if unread != 0 {
+		t.Error("un compte désactivé ne doit plus être notifié")
+	}
+
+	// L'historique est gardé, et on peut réactiver
+	if users := decode[[]User](t, e.admin.expect(http.StatusOK, "GET", "/users", "")); len(users) != 5 {
+		t.Error("le compte désactivé doit rester dans la liste")
+	}
+	e.admin.expect(http.StatusOK, "PATCH", url, `{"active":true}`)
+	c.expect(http.StatusOK, "POST", "/auth/login", `{"email":"agent@test.gn","password":"motdepasse"}`)
+
+	me := decode[User](t, e.admin.expect(http.StatusOK, "GET", "/auth/me", ""))
+	e.admin.expect(http.StatusBadRequest, "PATCH", "/users/"+itoa(me.ID)+"/active", `{"active":false}`)
+}
+
+// ---------- Rouvrir et noter ----------
+
+func TestRouvrirEtNoter(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Imprimante")
+	url := "/requests/" + itoa(id)
+
+	e.alice.expect(http.StatusBadRequest, "POST", url+"/rating", `{"rating":5}`) // pas encore terminée
+	e.alice.expect(http.StatusBadRequest, "POST", url+"/reopen", `{"message":"Toujours en panne"}`)
+
+	e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"in_progress"}`)
+	r := decode[Request](t, e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"done"}`))
+	if r.ResolvedAt == nil {
+		t.Fatal("resolved_at devrait être rempli")
+	}
+
+	// Note
+	e.alice.expect(http.StatusBadRequest, "POST", url+"/rating", `{"rating":6}`)
+	e.alice.expect(http.StatusBadRequest, "POST", url+"/rating", `{"rating":0}`)
+	e.bob.expect(http.StatusNotFound, "POST", url+"/rating", `{"rating":1}`)
+	e.agent.expect(http.StatusForbidden, "POST", url+"/rating", `{"rating":5}`)
+	r = decode[Request](t, e.alice.expect(http.StatusOK, "POST", url+"/rating", `{"rating":4,"comment":"Rapide, merci"}`))
+	if r.Rating == nil || *r.Rating != 4 || r.RatingNote != "Rapide, merci" {
+		t.Errorf("note : %+v", r)
+	}
+	n := decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.agent.expect(http.StatusOK, "GET", "/notifications", ""))
+	if !strings.Contains(n.Items[0].Message, "★★★★☆") {
+		t.Errorf("l'agent devrait voir la note : %q", n.Items[0].Message)
+	}
+
+	// Rouvrir : raison obligatoire, revient en cours chez le même agent, note effacée
+	e.alice.expect(http.StatusBadRequest, "POST", url+"/reopen", `{"message":"  "}`)
+	e.agent.expect(http.StatusForbidden, "POST", url+"/reopen", `{"message":"x"}`)
+	r = decode[Request](t, e.alice.expect(http.StatusOK, "POST", url+"/reopen", `{"message":"Le bourrage papier est revenu"}`))
+	if r.Status != StatusInProgress || r.AssigneeID == nil || *r.AssigneeID != e.agentID || r.Rating != nil || r.ResolvedAt != nil {
+		t.Errorf("après réouverture : %+v", r)
+	}
+	comments := decode[[]Comment](t, e.alice.expect(http.StatusOK, "GET", url+"/comments", ""))
+	if len(comments) != 1 || !strings.Contains(comments[0].Message, "bourrage papier") {
+		t.Errorf("la raison doit être dans les réponses : %+v", comments)
+	}
+	n = decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.agent.expect(http.StatusOK, "GET", "/notifications", ""))
+	if !strings.Contains(n.Items[0].Message, "a rouvert la demande") {
+		t.Errorf("l'agent doit être prévenu : %q", n.Items[0].Message)
+	}
+
+	// Remettre « ouverte » à la main efface aussi la note
+	e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"done"}`)
+	e.alice.expect(http.StatusOK, "POST", url+"/rating", `{"rating":2}`)
+	r = decode[Request](t, e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"in_progress"}`))
+	if r.Rating != nil || r.ResolvedAt != nil {
+		t.Errorf("note et date de fin doivent être effacées : %+v", r)
+	}
+}
+
+// ---------- Recherche ----------
+
+func TestRecherche(t *testing.T) {
+	e := setup(t)
+	a := create(e.alice, "Imprimante en panne")
+	b := create(e.bob, "Nouvelle souris")
+	e.agent.expect(http.StatusCreated, "POST", "/requests/"+itoa(b)+"/comments", `{"message":"Modèle sans fil commandé"}`)
+	pct := create(e.bob, "Remise de cent pour cent")
+
+	search := func(c *client, q string) []int {
+		var ids []int
+		for _, r := range decode[[]Request](t, c.expect(http.StatusOK, "GET", "/requests?q="+url.QueryEscape(q), "")) {
+			ids = append(ids, r.ID)
+		}
+		return ids
+	}
+	check := func(c *client, q string, want ...int) {
+		t.Helper()
+		got := search(c, q)
+		if len(got) != len(want) {
+			t.Errorf("recherche %q : %v, attendu %v", q, got, want)
+			return
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("recherche %q : %v, attendu %v", q, got, want)
+			}
+		}
+	}
+
+	check(e.agent, "imprimante", a) // titre, sans tenir compte des majuscules
+	check(e.agent, "sans fil", b)   // dans une réponse
+	check(e.agent, "Bob", pct, b)   // le demandeur
+	check(e.agent, "#"+itoa(a), a)  // par numéro
+	check(e.agent, "%")             // le % est cherché tel quel, pas comme un joker
+	check(e.agent, "introuvable")
+	check(e.alice, "souris") // Alice ne trouve pas les demandes de Bob
+	check(e.alice, "panne", a)
+	e.agent.expect(http.StatusBadRequest, "GET", "/requests?q="+strings.Repeat("a", 101), "")
+}
+
+// ---------- Export CSV ----------
+
+func TestExportCSV(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Ecran")
+	e.alice.expect(http.StatusCreated, "POST", "/requests", `{"title":"Formule","description":"=HYPERLINK(\"http://x\")","priority":"urgent"}`)
+	create(e.bob, "Souris")
+	e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(id), `{"status":"done"}`)
+	e.alice.expect(http.StatusOK, "POST", "/requests/"+itoa(id)+"/rating", `{"rating":5}`)
+
+	rec := e.agent.expect(http.StatusOK, "GET", "/requests/export.csv", "")
+	body := rec.Body.String()
+	if !strings.HasPrefix(rec.Header().Get("Content-Disposition"), "attachment") || !strings.HasPrefix(body, "\xEF\xBB\xBF") {
+		t.Errorf("en-têtes : %v", rec.Header())
+	}
+	lines := strings.Split(strings.TrimSpace(strings.TrimPrefix(body, "\xEF\xBB\xBF")), "\n")
+	if len(lines) != 4 || !strings.HasPrefix(lines[0], "N°;Titre;") {
+		t.Fatalf("CSV inattendu :\n%s", body)
+	}
+	if !strings.Contains(body, "'=HYPERLINK") {
+		t.Error("une formule doit être neutralisée par une apostrophe")
+	}
+	if !strings.Contains(body, ";5/5;") || !strings.Contains(body, ";terminée;") {
+		t.Errorf("la note et le statut doivent apparaître :\n%s", body)
+	}
+
+	// Filtres et visibilité
+	if l := strings.Split(strings.TrimSpace(e.agent.expect(http.StatusOK, "GET", "/requests/export.csv?priority=urgent", "").Body.String()), "\n"); len(l) != 2 {
+		t.Errorf("export filtré : %d lignes", len(l))
+	}
+	if l := strings.Split(strings.TrimSpace(e.bob.expect(http.StatusOK, "GET", "/requests/export.csv", "").Body.String()), "\n"); len(l) != 2 {
+		t.Errorf("Bob ne doit exporter que sa demande : %d lignes", len(l))
+	}
+	e.agent.expect(http.StatusBadRequest, "GET", "/requests/export.csv?status=x", "")
+}
+
+// ---------- Tableau de bord ----------
+
+func TestTableauDeBord(t *testing.T) {
+	e := setup(t)
+	a := create(e.alice, "Ecran")
+	b := create(e.bob, "Souris")
+	e.alice.expect(http.StatusCreated, "POST", "/requests", `{"title":"Serveur","priority":"urgent","category":"informatique"}`)
+
+	e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(a), `{"status":"done"}`)
+	e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(b), `{"status":"done"}`)
+	// Durées connues : 2 h et 4 h
+	db.Exec(`UPDATE requests SET created_at = ?, resolved_at = ? WHERE id = ?`, time.Now().Add(-2*time.Hour), time.Now(), a)
+	db.Exec(`UPDATE requests SET created_at = ?, resolved_at = ? WHERE id = ?`, time.Now().Add(-4*time.Hour), time.Now(), b)
+	e.alice.expect(http.StatusOK, "POST", "/requests/"+itoa(a)+"/rating", `{"rating":5}`)
+	e.bob.expect(http.StatusOK, "POST", "/requests/"+itoa(b)+"/rating", `{"rating":3}`)
+
+	e.agent.expect(http.StatusForbidden, "GET", "/stats/dashboard", "")
+	d := decode[struct {
+		Totals       map[string]int `json:"totals"`
+		AvgHours     *float64       `json:"avg_resolution_hours"`
+		Satisfaction struct {
+			Average      *float64 `json:"average"`
+			Count        int      `json:"count"`
+			Distribution []int    `json:"distribution"`
+		} `json:"satisfaction"`
+		ByCategory []countItem `json:"by_category"`
+		Weekly     []weekItem  `json:"weekly"`
+		Agents     []struct {
+			Name      string   `json:"name"`
+			Done      int      `json:"done"`
+			AvgHours  *float64 `json:"avg_resolution_hours"`
+			AvgRating *float64 `json:"avg_rating"`
+		} `json:"agents"`
+	}](t, e.admin.expect(http.StatusOK, "GET", "/stats/dashboard", ""))
+
+	if d.Totals["total"] != 3 || d.Totals["done"] != 2 || d.Totals["urgent_open"] != 1 || d.Totals["unassigned"] != 1 {
+		t.Errorf("totaux : %v", d.Totals)
+	}
+	if d.AvgHours == nil || *d.AvgHours < 2.9 || *d.AvgHours > 3.1 {
+		t.Errorf("délai moyen : %v, attendu 3 h", d.AvgHours)
+	}
+	if d.Satisfaction.Count != 2 || *d.Satisfaction.Average != 4 || d.Satisfaction.Distribution[4] != 1 || d.Satisfaction.Distribution[2] != 1 {
+		t.Errorf("satisfaction : %+v", d.Satisfaction)
+	}
+	if d.ByCategory[0].Key != "autre" || d.ByCategory[0].Count != 2 {
+		t.Errorf("catégories : %+v", d.ByCategory)
+	}
+	if len(d.Weekly) != 8 || d.Weekly[7].Created != 3 || d.Weekly[7].Resolved != 2 {
+		t.Errorf("semaines : %+v", d.Weekly)
+	}
+	if d.Agents[0].Name != "Moussa Agent" || d.Agents[0].Done != 2 || *d.Agents[0].AvgRating != 4 {
+		t.Errorf("agents : %+v", d.Agents[0])
 	}
 }

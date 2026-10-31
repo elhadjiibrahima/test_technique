@@ -582,6 +582,103 @@
     .contact { color: var(--texte-doux); text-decoration: none; }
     .contact:hover { text-decoration: underline; }
 
+    /* ---------- Recherche, export ---------- */
+    .recherche { display: flex; gap: .5rem; margin-bottom: .6rem; }
+    .recherche input { flex: 1; min-width: 0; padding: .55rem .8rem; font-size: .88rem; }
+    .btn-export {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--texte);
+      text-decoration: none;
+      background: var(--bg);
+      border: 1.5px solid var(--bordure);
+      border-radius: 10px;
+      padding: .4rem .8rem;
+    }
+    .btn-export:hover { border-color: var(--primaire); color: var(--primaire); }
+
+    /* ---------- Note et réouverture ---------- */
+    .note { margin-top: .6rem; font-size: .85rem; }
+    .note .etoiles-fixes { color: #f59e0b; letter-spacing: .05em; }
+    .note .commentaire-note { color: var(--texte-doux); font-style: italic; }
+    .noter {
+      margin-top: .7rem;
+      padding: .7rem .8rem;
+      border-radius: 12px;
+      background: var(--termine-fond);
+      font-size: .85rem;
+    }
+    .noter strong { display: block; margin-bottom: .3rem; }
+    .etoiles { display: inline-flex; gap: .1rem; }
+    .etoile {
+      width: auto;
+      background: none;
+      color: #d1d5db;
+      font-size: 1.5rem;
+      line-height: 1;
+      padding: 0 .1rem;
+    }
+    .etoile.allumee, .etoile:hover { background: none; color: #f59e0b; }
+    .noter .ligne-note { display: flex; gap: .5rem; margin-top: .4rem; }
+    .noter input { font-size: .85rem; padding: .45rem .6rem; }
+    .noter .ligne-note button { width: auto; flex-shrink: 0; padding: .45rem .9rem; font-size: .82rem; }
+
+    /* ---------- Utilisateurs désactivés ---------- */
+    .ligne-user.inactif .infos { opacity: .55; }
+    .badge-inactif {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: var(--erreur-fond);
+      color: var(--erreur);
+      padding: .1rem .45rem;
+      border-radius: 999px;
+      margin-left: .35rem;
+      vertical-align: middle;
+    }
+
+    /* ---------- Tableau de bord ---------- */
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+    .kpi { background: var(--carte); border: 1px solid var(--bordure); border-radius: 14px; box-shadow: var(--ombre); padding: 1rem; }
+    .kpi strong { display: block; font-size: 1.7rem; line-height: 1.15; }
+    .kpi span { font-size: .78rem; color: var(--texte-doux); font-weight: 600; }
+    .kpi.alerte strong { color: var(--erreur); }
+    .grille-tableau { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+    .grille-tableau .large { grid-column: 1 / -1; }
+    /* sans ça, le tableau des agents élargit la page sur mobile au lieu de défiler */
+    .vue-utilisateurs, .grille-tableau > *, .kpis > * { min-width: 0; }
+    @media (max-width: 820px) { .grille-tableau { grid-template-columns: 1fr; } }
+    .legende { font-size: .75rem; color: var(--texte-doux); margin: -.5rem 0 .8rem; }
+    .pastille-cree, .pastille-fini { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 .2rem 0 .5rem; vertical-align: -1px; }
+    .pastille-cree { background: var(--primaire); }
+    .pastille-fini { background: var(--termine); }
+    .semaines { display: flex; align-items: flex-end; gap: .4rem; height: 170px; }
+    .semaine { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+    .barres { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 2px; }
+    .baton { width: 42%; max-width: 18px; border-radius: 4px 4px 0 0; min-height: 2px; position: relative; }
+    .baton.cree { background: var(--primaire); }
+    .baton.fini { background: var(--termine); }
+    .semaine small { font-size: .65rem; color: var(--texte-doux); margin-top: .3rem; white-space: nowrap; }
+    .ligne-graph { display: grid; grid-template-columns: 9.5rem 1fr 2rem; gap: .5rem; align-items: center; font-size: .82rem; margin-bottom: .5rem; }
+    .ligne-graph .piste { background: var(--bg); border-radius: 999px; height: 12px; overflow: hidden; }
+    .ligne-graph .rempli { background: var(--primaire); height: 100%; border-radius: 999px; }
+    .ligne-graph .rempli.urgent { background: var(--erreur); }
+    .ligne-graph .rempli.normal { background: var(--encours); }
+    .ligne-graph .rempli.low, .ligne-graph .rempli.note { background: var(--termine); }
+    .ligne-graph .rempli.etoile-graph { background: #f59e0b; }
+    .ligne-graph b { text-align: right; }
+    .grosse-note { font-size: 2rem; font-weight: 700; margin-bottom: .2rem; }
+    .grosse-note small { font-size: .85rem; color: var(--texte-doux); font-weight: 500; }
+    .tableau-defile { overflow-x: auto; }
+    .tableau-agents { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .tableau-agents th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--texte-doux); padding: .5rem; border-bottom: 1px solid var(--bordure); white-space: nowrap; }
+    .tableau-agents td { padding: .6rem .5rem; border-bottom: 1px solid var(--bordure); white-space: nowrap; }
+    .tableau-agents td small { display: block; color: var(--texte-doux); }
+    .tableau-agents .nombre { text-align: right; }
+
     /* ---------- Fenêtre mot de passe ---------- */
     dialog {
       border: 1px solid var(--bordure);
@@ -632,6 +729,7 @@
 
       <nav class="onglets" id="onglets" hidden>
         <button type="button" class="onglet actif" data-vue="demandes">Demandes</button>
+        <button type="button" class="onglet" data-vue="tableau">Tableau de bord</button>
         <button type="button" class="onglet" data-vue="utilisateurs">Utilisateurs</button>
       </nav>
     </div>
@@ -725,6 +823,10 @@
         <button type="button" class="puce" data-assignee="none">Non assignées</button>
       </div>
 
+      <div class="recherche">
+        <input id="recherche" type="search" maxlength="100" placeholder="🔍 Rechercher (titre, description, demandeur, réponses, n°)" aria-label="Rechercher une demande">
+        <a class="btn-export" id="exporter" href="/requests/export.csv" download>⬇️ Exporter</a>
+      </div>
       <div class="outils-liste">
         <select id="filtre-priorite" class="petit" aria-label="Filtrer par priorité">
           <option value="">Toutes priorités</option>
@@ -796,6 +898,34 @@
           <button type="submit" id="btn-profil">Enregistrer mon profil</button>
         </form>
       </section>
+    </div>
+
+    <!-- ----- Vue Tableau de bord (admin) ----- -->
+    <div class="vue vue-utilisateurs" data-vue="tableau" hidden>
+      <div class="kpis" id="kpis"></div>
+      <div class="grille-tableau">
+        <section class="carte">
+          <h2>Demandes par semaine</h2>
+          <p class="legende"><span class="pastille-cree"></span> créées <span class="pastille-fini"></span> terminées</p>
+          <div class="semaines" id="graph-semaines"></div>
+        </section>
+        <section class="carte">
+          <h2>Satisfaction des demandeurs</h2>
+          <div id="graph-satisfaction"></div>
+        </section>
+        <section class="carte">
+          <h2>Par catégorie</h2>
+          <div id="graph-categories"></div>
+        </section>
+        <section class="carte">
+          <h2>Par priorité</h2>
+          <div id="graph-priorites"></div>
+        </section>
+        <section class="carte large">
+          <h2>Activité des agents</h2>
+          <div class="tableau-defile"><table class="tableau-agents" id="table-agents"></table></div>
+        </section>
+      </div>
     </div>
 
     <!-- ----- Vue Utilisateurs (admin) ----- -->
@@ -873,6 +1003,37 @@
       <button type="button" id="copier-lien">Copier</button>
     </div>
     <div class="boutons"><button type="button" class="secondaire" id="fermer-lien">Fermer</button></div>
+  </dialog>
+
+  <!-- Fenêtre : modifier un utilisateur (admin) -->
+  <dialog id="dialog-user">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem">Modifier <span id="edit-user-nom"></span></h2>
+    <div id="erreur-edit-user" class="message-erreur" role="alert"></div>
+    <form id="form-edit-user">
+      <div class="champ"><label for="eu-nom">Nom complet</label><input id="eu-nom" required minlength="2" maxlength="50"></div>
+      <div class="champ"><label for="eu-poste">Poste</label><input id="eu-poste" list="postes" required minlength="2" maxlength="80"></div>
+      <div class="champ"><label for="eu-email">E-mail de connexion</label><input id="eu-email" type="email" required></div>
+      <div class="champ"><label for="eu-tel">Téléphone</label><input id="eu-tel" type="tel" maxlength="25"></div>
+      <div class="champ"><label for="eu-adresse">Adresse</label><textarea id="eu-adresse" maxlength="200"></textarea></div>
+      <div class="boutons">
+        <button type="button" class="secondaire" id="fermer-edit-user">Annuler</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Fenêtre : rouvrir une demande -->
+  <dialog id="dialog-rouvrir">
+    <h2 style="font-size:1.1rem;margin-bottom:.5rem">Rouvrir la demande</h2>
+    <p style="font-size:.88rem;color:var(--texte-doux);margin-bottom:1rem">Expliquez ce qui ne va pas : votre message sera ajouté aux réponses et l'équipe sera prévenue.</p>
+    <div id="erreur-rouvrir" class="message-erreur" role="alert"></div>
+    <form id="form-rouvrir">
+      <div class="champ"><textarea id="rouvrir-message" required maxlength="1000" placeholder="Ex : le problème est revenu ce matin" aria-label="Raison de la réouverture"></textarea></div>
+      <div class="boutons">
+        <button type="button" class="secondaire" id="fermer-rouvrir">Annuler</button>
+        <button type="submit">Rouvrir</button>
+      </div>
+    </form>
   </dialog>
 
   <datalist id="postes">
@@ -1237,6 +1398,7 @@
       for (const o of document.querySelectorAll(".onglet")) o.classList.toggle("actif", o.dataset.vue === nom);
       if (nom === "utilisateurs") chargerUtilisateurs();
       else if (nom === "profil") remplirProfil();
+      else if (nom === "tableau") chargerTableau();
       else if (moi) chargerTout(); // les agents ont pu changer : on réaffiche la liste
     }
     for (const o of document.querySelectorAll(".onglet")) {
@@ -1346,6 +1508,10 @@
       if ($("filtre-priorite").value) url += "&priority=" + $("filtre-priorite").value;
       if ($("filtre-categorie").value) url += "&category=" + $("filtre-categorie").value;
       url += "&sort=" + $("tri").value;
+      const texte = $("recherche").value.trim();
+      if (texte) url += "&q=" + encodeURIComponent(texte);
+      // Le bouton Exporter télécharge exactement ce qui est affiché (toutes les pages)
+      $("exporter").href = "/requests/export.csv?" + url.split("?")[1].replace(/(^|&)(page|limit)=[^&]*/g, "").replace(/^&/, "");
 
       let reponse;
       try {
@@ -1378,6 +1544,11 @@
       $("suivant").disabled = page >= nbPages;
     }
 
+    let minuteurRecherche;
+    $("recherche").addEventListener("input", () => {
+      clearTimeout(minuteurRecherche);
+      minuteurRecherche = setTimeout(() => { page = 1; chargerListe(); }, 300);
+    });
     for (const id of ["filtre-priorite", "filtre-categorie", "tri"]) {
       $(id).addEventListener("change", () => { page = 1; chargerListe(); });
     }
@@ -1421,7 +1592,7 @@
       liste.innerHTML = "";
 
       if (demandes.length === 0) {
-        liste.innerHTML = (filtre || filtreAgent || $("filtre-priorite").value || $("filtre-categorie").value)
+        liste.innerHTML = (filtre || filtreAgent || $("filtre-priorite").value || $("filtre-categorie").value || $("recherche").value.trim())
           ? '<div class="vide"><span class="icone">🔍</span>Aucune demande avec ces filtres.</div>'
           : '<div class="vide"><span class="icone">📭</span>Aucune demande pour le moment.</div>';
         return;
@@ -1560,8 +1731,14 @@
           () => basculerPanneau(historiquesOuverts, d, panHisto, chargerHistorique));
         actions.prepend(btnReponses, btnFichiers, btnHisto);
 
+        // Rouvrir une demande terminée : le demandeur, ou un admin
+        if (d.status === "done" && (estAMoi || moi.role === "admin")) {
+          actions.appendChild(petitBouton("🔁 Rouvrir", "", () => ouvrirRouvrir(d)));
+        }
+
         meta.appendChild(actions);
         carte.appendChild(meta);
+        if (d.status === "done") carte.appendChild(blocNote(d, estAMoi));
         carte.append(fil, panFichiers, panHisto);
         liste.appendChild(carte);
         if (!fil.hidden) chargerFil(d, fil);
@@ -1762,6 +1939,241 @@
       panneau.appendChild(ul);
     }
 
+
+    // ---------- Note de satisfaction ----------
+
+    function etoilesTexte(n) { return "★".repeat(n) + "☆".repeat(5 - n); }
+
+    // blocNote : affiche la note, ou (pour le demandeur) le formulaire pour noter
+    function blocNote(d, estAMoi) {
+      const bloc = document.createElement("div");
+      if (!estAMoi) {
+        bloc.className = "note";
+        if (d.rating) {
+          const e = document.createElement("span");
+          e.className = "etoiles-fixes";
+          e.textContent = etoilesTexte(d.rating);
+          bloc.append("Note du demandeur : ", e, " " + d.rating + "/5");
+          if (d.rating_comment) {
+            const c = document.createElement("span");
+            c.className = "commentaire-note";
+            c.textContent = " — « " + d.rating_comment + " »";
+            bloc.appendChild(c);
+          }
+        } else {
+          bloc.textContent = "⭐ Pas encore noté par le demandeur";
+        }
+        return bloc;
+      }
+
+      bloc.className = "noter";
+      const titre = document.createElement("strong");
+      titre.textContent = d.rating ? "Votre note (vous pouvez la changer)" : "Votre demande est terminée : notez le traitement";
+      bloc.appendChild(titre);
+      let choisie = d.rating || 0;
+      const etoiles = document.createElement("div");
+      etoiles.className = "etoiles";
+      etoiles.setAttribute("role", "radiogroup");
+      etoiles.setAttribute("aria-label", "Note de 1 à 5");
+      const boutons = [];
+      const allumer = (n) => boutons.forEach((b, i) => b.classList.toggle("allumee", i < n));
+      for (let i = 1; i <= 5; i++) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "etoile";
+        b.textContent = "★";
+        b.setAttribute("aria-label", i + " sur 5");
+        b.addEventListener("click", () => { choisie = i; allumer(i); });
+        b.addEventListener("mouseenter", () => allumer(i));
+        b.addEventListener("mouseleave", () => allumer(choisie));
+        boutons.push(b);
+        etoiles.appendChild(b);
+      }
+      allumer(choisie);
+      bloc.appendChild(etoiles);
+
+      const ligne = document.createElement("div");
+      ligne.className = "ligne-note";
+      const commentaire = document.createElement("input");
+      commentaire.maxLength = 300;
+      commentaire.placeholder = "Un commentaire ? (optionnel)";
+      commentaire.value = d.rating_comment || "";
+      commentaire.setAttribute("aria-label", "Commentaire sur le traitement");
+      const envoyer = document.createElement("button");
+      envoyer.type = "button";
+      envoyer.textContent = d.rating ? "Mettre à jour" : "Envoyer";
+      envoyer.addEventListener("click", async () => {
+        if (!choisie) { afficherToast("Choisissez une note de 1 à 5 étoiles.", true); return; }
+        try {
+          await api("POST", "/requests/" + d.id + "/rating", { rating: choisie, comment: commentaire.value.trim() });
+          afficherToast("Merci pour votre note ✓");
+          chargerListe();
+        } catch (err) {
+          afficherToast(err.message, true);
+        }
+      });
+      ligne.append(commentaire, envoyer);
+      bloc.appendChild(ligne);
+      return bloc;
+    }
+
+    // ---------- Rouvrir une demande ----------
+
+    let demandeARouvrir = null;
+    function ouvrirRouvrir(d) {
+      demandeARouvrir = d;
+      $("form-rouvrir").reset();
+      cacher($("erreur-rouvrir"));
+      $("dialog-rouvrir").showModal();
+    }
+    $("fermer-rouvrir").addEventListener("click", () => $("dialog-rouvrir").close());
+    $("form-rouvrir").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api("POST", "/requests/" + demandeARouvrir.id + "/reopen", { message: $("rouvrir-message").value });
+        $("dialog-rouvrir").close();
+        filsOuverts.add(demandeARouvrir.id);
+        afficherToast("Demande rouverte ✓ L'équipe a été prévenue.");
+        chargerTout();
+      } catch (err) {
+        afficherErreur($("erreur-rouvrir"), err);
+      }
+    });
+
+    // ---------- Tableau de bord (admin) ----------
+
+    function heures(h) {
+      if (h === null || h === undefined) return "—";
+      if (h < 1) return Math.max(1, Math.round(h * 60)) + " min";
+      if (h < 48) return (Math.round(h * 10) / 10).toString().replace(".", ",") + " h";
+      return (Math.round(h / 24 * 10) / 10).toString().replace(".", ",") + " j";
+    }
+
+    function ligneGraph(libelle, valeur, max, classe, texteValeur) {
+      const l = document.createElement("div");
+      l.className = "ligne-graph";
+      const nom = document.createElement("span");
+      nom.textContent = libelle;
+      const piste = document.createElement("div");
+      piste.className = "piste";
+      const rempli = document.createElement("div");
+      rempli.className = "rempli " + (classe || "");
+      rempli.style.width = (max ? Math.round(valeur / max * 100) : 0) + "%";
+      piste.appendChild(rempli);
+      const v = document.createElement("b");
+      v.textContent = texteValeur ?? valeur;
+      l.append(nom, piste, v);
+      return l;
+    }
+
+    async function chargerTableau() {
+      let d;
+      try {
+        d = await (await api("GET", "/stats/dashboard")).json();
+      } catch (err) {
+        afficherToast(err.message, true);
+        return;
+      }
+      const t = d.totals;
+      const kpis = [
+        [t.total, "Demandes au total"],
+        [t.open + t.in_progress, "À traiter (ouvertes + en cours)"],
+        [t.unassigned, "Sans agent", t.unassigned > 0],
+        [t.urgent_open, "Urgentes non terminées", t.urgent_open > 0],
+        [heures(d.avg_resolution_hours), "Délai moyen de traitement"],
+        [d.satisfaction.average ? (Math.round(d.satisfaction.average * 10) / 10).toString().replace(".", ",") + " / 5" : "—", "Satisfaction moyenne"],
+      ];
+      $("kpis").innerHTML = "";
+      for (const [valeur, libelle, alerte] of kpis) {
+        const k = document.createElement("div");
+        k.className = "kpi" + (alerte ? " alerte" : "");
+        const v = document.createElement("strong");
+        v.textContent = valeur;
+        const l = document.createElement("span");
+        l.textContent = libelle;
+        k.append(v, l);
+        $("kpis").appendChild(k);
+      }
+
+      // Semaines
+      const semaines = $("graph-semaines");
+      semaines.innerHTML = "";
+      const maxSem = Math.max(1, ...d.weekly.map((w) => Math.max(w.created, w.resolved)));
+      for (const w of d.weekly) {
+        const col = document.createElement("div");
+        col.className = "semaine";
+        const barres = document.createElement("div");
+        barres.className = "barres";
+        for (const [classe, n, quoi] of [["cree", w.created, "créées"], ["fini", w.resolved, "terminées"]]) {
+          const b = document.createElement("div");
+          b.className = "baton " + classe;
+          b.style.height = (n / maxSem * 100) + "%";
+          b.title = n + " " + quoi;
+          barres.appendChild(b);
+        }
+        const date = document.createElement("small");
+        const lundi = new Date(w.week_start + "T00:00:00");
+        date.textContent = lundi.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+        date.title = "Semaine du " + lundi.toLocaleDateString("fr-FR", { dateStyle: "long" });
+        col.append(barres, date);
+        semaines.appendChild(col);
+      }
+
+      // Satisfaction
+      const sat = $("graph-satisfaction");
+      sat.innerHTML = "";
+      const grosse = document.createElement("div");
+      grosse.className = "grosse-note";
+      if (d.satisfaction.count) {
+        grosse.textContent = (Math.round(d.satisfaction.average * 10) / 10).toString().replace(".", ",") + " / 5 ";
+        const nb = document.createElement("small");
+        nb.textContent = "sur " + d.satisfaction.count + " note" + (d.satisfaction.count > 1 ? "s" : "");
+        grosse.appendChild(nb);
+      } else {
+        grosse.innerHTML = '<small>Aucune note pour le moment.</small>';
+      }
+      sat.appendChild(grosse);
+      const maxNote = Math.max(1, ...d.satisfaction.distribution);
+      for (let n = 5; n >= 1; n--) {
+        sat.appendChild(ligneGraph(etoilesTexte(n), d.satisfaction.distribution[n - 1], maxNote, "etoile-graph"));
+      }
+
+      // Catégories et priorités
+      const cats = $("graph-categories");
+      cats.innerHTML = "";
+      const maxCat = Math.max(1, ...d.by_category.map((c) => c.count));
+      for (const c of d.by_category) cats.appendChild(ligneGraph(CATEGORIES[c.key] || c.label, c.count, maxCat));
+      const prios = $("graph-priorites");
+      prios.innerHTML = "";
+      const maxPrio = Math.max(1, ...d.by_priority.map((c) => c.count));
+      for (const c of d.by_priority) prios.appendChild(ligneGraph(PRIORITES[c.key] || c.label, c.count, maxPrio, c.key));
+
+      // Agents
+      const table = $("table-agents");
+      table.innerHTML = "<thead><tr><th>Agent</th><th class='nombre'>En cours</th><th class='nombre'>Terminées</th><th class='nombre'>Délai moyen</th><th class='nombre'>Note moyenne</th></tr></thead>";
+      const corps = document.createElement("tbody");
+      for (const a of d.agents) {
+        const tr = document.createElement("tr");
+        const nom = document.createElement("td");
+        const fort = document.createElement("strong");
+        fort.textContent = a.name;
+        const poste = document.createElement("small");
+        poste.textContent = (a.job_title || "") + " · " + (ROLES[a.role] || a.role);
+        nom.append(fort, poste);
+        tr.appendChild(nom);
+        const note = a.avg_rating ? (Math.round(a.avg_rating * 10) / 10).toString().replace(".", ",") + " ★ (" + a.rating_count + ")" : "—";
+        for (const v of [a.open, a.done, heures(a.avg_resolution_hours), note]) {
+          const td = document.createElement("td");
+          td.className = "nombre";
+          td.textContent = v;
+          tr.appendChild(td);
+        }
+        corps.appendChild(tr);
+      }
+      if (!d.agents.length) corps.innerHTML = "<tr><td colspan='5'>Aucun agent pour le moment.</td></tr>";
+      table.appendChild(corps);
+    }
+
     // ---------- Fil des réponses d'une demande ----------
 
     function basculerFil(d, fil) {
@@ -1858,12 +2270,18 @@
       liste.innerHTML = "";
       for (const u of users) {
         const ligne = document.createElement("div");
-        ligne.className = "ligne-user";
+        ligne.className = "ligne-user" + (u.active ? "" : " inactif");
 
         const infos = document.createElement("div");
         infos.className = "infos";
         const nom = document.createElement("strong");
         nom.textContent = u.name + (u.id === moi.id ? " (vous)" : "");
+        if (!u.active) {
+          const badge = document.createElement("span");
+          badge.className = "badge-inactif";
+          badge.textContent = "Désactivé";
+          nom.appendChild(badge);
+        }
         const email = document.createElement("small");
         email.textContent = [u.job_title, u.email, u.phone].filter(Boolean).join(" · ");
         infos.append(nom, email);
@@ -1885,7 +2303,26 @@
         });
         ligne.appendChild(role);
 
+        const modifier = petitBouton("✏️", "", () => ouvrirEditionUser(u));
+        modifier.title = "Modifier la fiche de " + u.name;
+        ligne.appendChild(modifier);
+
         if (u.id !== moi.id) {
+          const bascule = petitBouton(u.active ? "⏸️" : "▶️", "", async () => {
+            const question = u.active
+              ? "Désactiver le compte de " + u.name + " ? Il ne pourra plus se connecter, mais son historique est gardé."
+              : "Réactiver le compte de " + u.name + " ?";
+            if (!confirm(question)) return;
+            try {
+              await api("PATCH", "/users/" + u.id + "/active", { active: !u.active });
+              afficherToast(u.active ? "Compte désactivé ✓" : "Compte réactivé ✓");
+            } catch (err) {
+              afficherToast(err.message, true);
+            }
+            chargerUtilisateurs();
+          });
+          bascule.title = (u.active ? "Désactiver" : "Réactiver") + " le compte de " + u.name;
+          ligne.appendChild(bascule);
           const cle = petitBouton("🔑", "", () => genererLienReset(u));
           cle.title = "Générer un lien pour réinitialiser le mot de passe de " + u.name;
           ligne.appendChild(cle);
@@ -1904,6 +2341,43 @@
       }
     }
 
+
+
+    // Modifier la fiche d'un utilisateur (admin)
+    let userEnEdition = null;
+    function ouvrirEditionUser(u) {
+      userEnEdition = u;
+      $("edit-user-nom").textContent = u.name;
+      $("eu-nom").value = u.name;
+      $("eu-poste").value = u.job_title || "";
+      $("eu-email").value = u.email;
+      $("eu-tel").value = u.phone || "";
+      $("eu-adresse").value = u.address || "";
+      cacher($("erreur-edit-user"));
+      $("dialog-user").showModal();
+    }
+    $("fermer-edit-user").addEventListener("click", () => $("dialog-user").close());
+    $("form-edit-user").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        const u = await (await api("PUT", "/users/" + userEnEdition.id, {
+          name: $("eu-nom").value.trim(),
+          job_title: $("eu-poste").value.trim(),
+          email: $("eu-email").value.trim(),
+          phone: $("eu-tel").value.trim(),
+          address: $("eu-adresse").value.trim(),
+        })).json();
+        $("dialog-user").close();
+        if (u.id === moi.id) {
+          moi = u;
+          $("nom-utilisateur").textContent = moi.name;
+        }
+        afficherToast("Fiche mise à jour ✓");
+        chargerUtilisateurs();
+      } catch (err) {
+        afficherErreur($("erreur-edit-user"), err);
+      }
+    });
 
     // Lien de réinitialisation du mot de passe, à transmettre à l'utilisateur
     async function genererLienReset(u) {

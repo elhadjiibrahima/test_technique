@@ -35,7 +35,7 @@ func forgotPassword(w http.ResponseWriter, r *http.Request) {
 
 	if validateEmail(email) == "" && !limiter.blocked(key) {
 		limiter.fail(key) // au plus 5 demandes par e-mail et par 15 minutes
-		if u, err := getUserByEmail(email); err == nil {
+		if u, err := getUserByEmail(email); err == nil && u.Active {
 			notifyAdmins(u.ID, u.Name+" ("+u.Email+") a oublié son mot de passe. "+
 				"Allez dans Utilisateurs → 🔑 pour générer un lien de réinitialisation.")
 		}
@@ -137,7 +137,7 @@ func getUserByEmail(email string) (User, error) {
 
 // notifyAdmins prévient tous les administrateurs
 func notifyAdmins(exceptID int, message string) {
-	rows, err := db.Query(`SELECT id FROM users WHERE role = ? AND id != ?`, RoleAdmin, exceptID)
+	rows, err := db.Query(`SELECT id FROM users WHERE role = ? AND id != ? AND active = 1`, RoleAdmin, exceptID)
 	if err != nil {
 		return
 	}

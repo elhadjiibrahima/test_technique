@@ -122,7 +122,7 @@ func currentUser(r *http.Request) (User, bool) {
 		return User{}, false
 	}
 	u, err := scanUser(db.QueryRow(
-		`SELECT `+userColumns+` FROM users WHERE id =
+		`SELECT `+userColumns+` FROM users WHERE active = 1 AND id =
 		 (SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?)`,
 		hashToken(c.Value), time.Now()))
 	return u, err == nil
@@ -328,9 +328,9 @@ func ensureAdmin() error {
 	if err != nil {
 		return err
 	}
-	// Le compte existe : on s'assure qu'il est admin. Son mot de passe actuel
-	// est gardé (il a pu être changé depuis la page).
-	_, err = db.Exec(`UPDATE users SET role = ? WHERE id = ?`, RoleAdmin, id)
+	// Le compte existe : on s'assure qu'il est admin et actif. Son mot de passe
+	// actuel est gardé (il a pu être changé depuis la page).
+	_, err = db.Exec(`UPDATE users SET role = ?, active = 1 WHERE id = ?`, RoleAdmin, id)
 	return err
 }
 
@@ -428,6 +428,12 @@ func login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	limiter.reset(email)
+	if !u.Active {
+		writeErrors(w, http.StatusForbidden, map[string]string{
+			"general": "Ce compte est désactivé. Contactez un administrateur.",
+		})
+		return
+	}
 	if startSession(w, r, u.ID) != nil {
 		serverError(w)
 		return

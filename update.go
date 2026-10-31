@@ -60,9 +60,27 @@ func updateStatus(w http.ResponseWriter, r *http.Request, u User) {
 		assignee = &u.ID // l'agent prend la demande en charge
 	}
 
+	// Date de résolution : notée quand la demande passe à « terminée »,
+	// effacée si elle repart en arrière
+	resolvedAt := current.ResolvedAt
+	now := time.Now()
+	if newStatus == StatusDone && current.Status != StatusDone {
+		resolvedAt = &now
+	} else if newStatus != StatusDone {
+		resolvedAt = nil
+	}
+
+	// La note du demandeur porte sur un traitement terminé : si la demande
+	// repart en arrière, on l'efface
+	rating, ratingNote := current.Rating, current.RatingNote
+	if newStatus != StatusDone {
+		rating, ratingNote = nil, ""
+	}
+
 	if _, err := db.Exec(
-		`UPDATE requests SET status = ?, priority = ?, assignee_id = ?, updated_at = ? WHERE id = ?`,
-		newStatus, newPriority, assignee, time.Now(), current.ID,
+		`UPDATE requests SET status = ?, priority = ?, assignee_id = ?, resolved_at = ?,
+		 rating = ?, rating_comment = ?, updated_at = ? WHERE id = ?`,
+		newStatus, newPriority, assignee, resolvedAt, rating, ratingNote, now, current.ID,
 	); err != nil {
 		writeErrors(w, http.StatusInternalServerError, map[string]string{
 			"general": "Erreur du serveur : la demande n'a pas pu être modifiée.",
