@@ -9,7 +9,8 @@ import (
 )
 
 const requestColumns = `r.id, r.title, r.description, r.requester, r.requester_id,
-	r.assignee_id, a.name, r.status, r.created_at, r.updated_at`
+	r.assignee_id, a.name, r.status, r.created_at, r.updated_at,
+	(SELECT COUNT(*) FROM comments c WHERE c.request_id = r.id)`
 
 const requestFrom = ` FROM requests r LEFT JOIN users a ON a.id = r.assignee_id`
 
@@ -17,7 +18,8 @@ const requestFrom = ` FROM requests r LEFT JOIN users a ON a.id = r.assignee_id`
 func scanRequest(row interface{ Scan(...any) error }) (Request, error) {
 	var req Request
 	err := row.Scan(&req.ID, &req.Title, &req.Description, &req.Requester, &req.RequesterID,
-		&req.AssigneeID, &req.AssigneeName, &req.Status, &req.CreatedAt, &req.UpdatedAt)
+		&req.AssigneeID, &req.AssigneeName, &req.Status, &req.CreatedAt, &req.UpdatedAt,
+		&req.CommentCount)
 	return req, err
 }
 

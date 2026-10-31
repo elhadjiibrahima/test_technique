@@ -275,7 +275,8 @@
     .lien:hover { background: var(--bordure); color: var(--texte); }
     .carte.edition { outline: 2px solid var(--primaire); outline-offset: -1px; }
 
-    .actions { display: flex; gap: .25rem; }
+    .actions { display: flex; gap: .25rem; flex-wrap: wrap; }
+    .btn-icone { white-space: nowrap; }
     .btn-icone {
       width: auto;
       background: none;
@@ -470,6 +471,32 @@
       border-radius: 10px;
       padding: .65rem .8rem;
     }
+
+    /* ---------- Réponses ---------- */
+    .btn-reponses.non-vide { border-color: var(--primaire); color: var(--primaire); }
+    .fil {
+      margin-top: .8rem;
+      padding-top: .8rem;
+      border-top: 1px dashed var(--bordure);
+    }
+    .fil[hidden] { display: none; }
+    .message {
+      max-width: 88%;
+      padding: .55rem .8rem;
+      border-radius: 12px;
+      margin-bottom: .5rem;
+      font-size: .88rem;
+      background: var(--bg);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .message.equipe { background: var(--ouvert-fond); border-bottom-left-radius: 4px; }
+    .message.demandeur { margin-left: auto; border-bottom-right-radius: 4px; }
+    .message .auteur { display: block; font-size: .72rem; font-weight: 700; color: var(--texte-doux); margin-bottom: .15rem; white-space: normal; }
+    .fil-vide { font-size: .82rem; color: var(--texte-doux); margin-bottom: .6rem; }
+    .form-reponse { display: flex; gap: .5rem; align-items: flex-end; }
+    .form-reponse textarea { min-height: 42px; height: 42px; font-size: .88rem; padding: .5rem .7rem; }
+    .form-reponse button { width: auto; padding: .55rem .9rem; font-size: .85rem; flex-shrink: 0; }
 
     /* ---------- Fenêtre mot de passe ---------- */
     dialog {
@@ -680,6 +707,7 @@
     let filtreAgent = "";    // "", "me" ou "none"
     let enEdition = null;    // demande en cours de modification
     let minuteurNotifs = null;
+    const filsOuverts = new Set(); // demandes dont le fil de réponses est ouvert
 
     // ---------- Appels au serveur ----------
 
@@ -874,6 +902,16 @@
           const date = document.createElement("small");
           date.textContent = new Date(n.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
           div.appendChild(date);
+          if (n.request_id) {
+            // Cliquer ouvre les réponses de la demande concernée
+            div.style.cursor = "pointer";
+            div.title = "Voir la demande #" + n.request_id;
+            div.addEventListener("click", () => {
+              filsOuverts.add(n.request_id);
+              fermerPanneaux();
+              changerVue("demandes");
+            });
+          }
           liste.appendChild(div);
         }
       } catch (_) { /* on réessaiera au prochain passage */ }
@@ -1132,9 +1170,19 @@
           actions.appendChild(petitBouton("🗑️ Supprimer", "danger", () => supprimerDemande(d)));
         }
 
-        if (actions.children.length) meta.appendChild(actions);
+        // Réponses : tout le monde qui voit la demande peut lire et répondre
+        const fil = document.createElement("div");
+        fil.className = "fil";
+        fil.hidden = !filsOuverts.has(d.id);
+        const btnReponses = petitBouton("💬 Réponses (" + d.comment_count + ")",
+          "btn-reponses" + (d.comment_count > 0 ? " non-vide" : ""), () => basculerFil(d, fil));
+        actions.prepend(btnReponses);
+
+        meta.appendChild(actions);
         carte.appendChild(meta);
+        carte.appendChild(fil);
         liste.appendChild(carte);
+        if (!fil.hidden) chargerFil(d, fil);
       }
     }
 
@@ -1168,6 +1216,79 @@
         afficherToast(err.message, true);
       }
       chargerTout();
+    }
+
+
+    // ---------- Fil des réponses d'une demande ----------
+
+    function basculerFil(d, fil) {
+      fil.hidden = !fil.hidden;
+      if (fil.hidden) {
+        filsOuverts.delete(d.id);
+      } else {
+        filsOuverts.add(d.id);
+        chargerFil(d, fil);
+      }
+    }
+
+    async function chargerFil(d, fil) {
+      let messages;
+      try {
+        messages = await (await api("GET", "/requests/" + d.id + "/comments")).json();
+      } catch (err) {
+        fil.textContent = err.message;
+        return;
+      }
+      fil.innerHTML = "";
+
+      if (messages.length === 0) {
+        const vide = document.createElement("p");
+        vide.className = "fil-vide";
+        vide.textContent = d.requester_id === moi.id
+          ? "Pas encore de réponse. L'équipe vous répondra ici."
+          : "Pas encore de réponse. Écrivez la première au demandeur.";
+        fil.appendChild(vide);
+      }
+      for (const m of messages) {
+        const bulle = document.createElement("div");
+        const deLEquipe = m.author_role !== "employe" && m.author_id !== d.requester_id;
+        bulle.className = "message " + (deLEquipe ? "equipe" : "demandeur");
+        const auteur = document.createElement("span");
+        auteur.className = "auteur";
+        const date = new Date(m.created_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+        auteur.textContent = (m.author_id === moi.id ? "Vous" : m.author_name)
+          + (deLEquipe ? " · " + (ROLES[m.author_role] || m.author_role) : "") + " · " + date;
+        bulle.appendChild(auteur);
+        bulle.append(m.message);
+        fil.appendChild(bulle);
+      }
+
+      const form = document.createElement("form");
+      form.className = "form-reponse";
+      const zone = document.createElement("textarea");
+      zone.maxLength = 1000;
+      zone.required = true;
+      zone.placeholder = d.requester_id === moi.id ? "Répondre à l'équipe…" : "Répondre au demandeur…";
+      zone.setAttribute("aria-label", "Réponse à la demande #" + d.id);
+      const envoyer = document.createElement("button");
+      envoyer.type = "submit";
+      envoyer.textContent = "Répondre";
+      form.append(zone, envoyer);
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!zone.value.trim()) return;
+        envoyer.disabled = true;
+        try {
+          await api("POST", "/requests/" + d.id + "/comments", { message: zone.value });
+          afficherToast("Réponse envoyée ✓");
+          filsOuverts.add(d.id);
+          chargerListe(); // met à jour le compteur et le fil
+        } catch (err) {
+          afficherToast(err.message, true);
+          envoyer.disabled = false;
+        }
+      });
+      fil.appendChild(form);
     }
 
     // ---------- Utilisateurs (admin) ----------

@@ -28,6 +28,10 @@ func routes() http.Handler {
 	mux.HandleFunc("PATCH /requests/{id}", requireAuth(updateStatus, RoleAgent, RoleAdmin))
 	mux.HandleFunc("PATCH /requests/{id}/assign", requireAuth(assignRequest, RoleAgent, RoleAdmin))
 
+	// Réponses sur une demande (admin, agents, et le demandeur)
+	mux.HandleFunc("GET /requests/{id}/comments", requireAuth(listComments))
+	mux.HandleFunc("POST /requests/{id}/comments", requireAuth(addComment))
+
 	// Notifications
 	mux.HandleFunc("GET /notifications", requireAuth(listNotifications))
 	mux.HandleFunc("POST /notifications/read", requireAuth(markNotificationsRead))

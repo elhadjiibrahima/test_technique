@@ -56,6 +56,17 @@ CREATE TABLE IF NOT EXISTS notifications (
 	created_at TIMESTAMP NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+
+CREATE TABLE IF NOT EXISTS comments (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	request_id  INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+	author_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	author_name TEXT NOT NULL,
+	author_role TEXT NOT NULL,
+	message     TEXT NOT NULL,
+	created_at  TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
 `
 
 // Colonnes ajoutées après la première version : on les ajoute aux bases

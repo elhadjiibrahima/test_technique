@@ -62,4 +62,16 @@ type Request struct {
 	Status       Status    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	CommentCount int       `json:"comment_count"` // nombre de réponses
+}
+
+// Comment : une réponse dans le fil d'une demande
+type Comment struct {
+	ID         int       `json:"id"`
+	RequestID  int       `json:"request_id"`
+	AuthorID   *int      `json:"author_id"`
+	AuthorName string    `json:"author_name"`
+	AuthorRole Role      `json:"author_role"`
+	Message    string    `json:"message"`
+	CreatedAt  time.Time `json:"created_at"`
 }

@@ -468,3 +468,75 @@ func TestAdminNePeutPasSeBloquer(t *testing.T) {
 	e.admin.expect(http.StatusBadRequest, "PATCH", "/users/"+itoa(me.ID), `{"role":"employe"}`)
 	e.admin.expect(http.StatusBadRequest, "DELETE", "/users/"+itoa(me.ID), "")
 }
+
+// ---------- Réponses sur les demandes ----------
+
+func TestReponses(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Clavier")
+	url := "/requests/" + itoa(id) + "/comments"
+
+	type notifs struct {
+		Unread int            `json:"unread"`
+		Items  []Notification `json:"items"`
+	}
+	lastNotif := func(c *client) string {
+		n := decode[notifs](t, c.expect(http.StatusOK, "GET", "/notifications", ""))
+		if len(n.Items) == 0 {
+			return ""
+		}
+		return n.Items[0].Message
+	}
+
+	// L'admin répond : Alice est notifiée
+	rec := e.admin.expect(http.StatusCreated, "POST", url, `{"message":"  Bonjour, le clavier arrive lundi.  "}`)
+	c := decode[Comment](t, rec)
+	if c.Message != "Bonjour, le clavier arrive lundi." || c.AuthorName != "Awa Admin" || c.AuthorRole != RoleAdmin {
+		t.Errorf("réponse inattendue : %+v", c)
+	}
+	if msg := lastNotif(e.alice); !strings.Contains(msg, "Awa Admin a répondu à votre demande") || !strings.Contains(msg, "arrive lundi") {
+		t.Errorf("notification d'Alice : %q", msg)
+	}
+
+	// Alice répond : la demande n'est pas assignée, donc les agents et admins sont notifiés
+	e.alice.expect(http.StatusCreated, "POST", url, `{"message":"Merci !"}`)
+	if msg := lastNotif(e.agent); !strings.Contains(msg, "Alice a répondu") {
+		t.Errorf("notification de l'agent : %q", msg)
+	}
+
+	// Une fois assignée, seul l'agent qui la traite est notifié
+	e.admin.expect(http.StatusOK, "PATCH", "/requests/"+itoa(id)+"/assign", `{"assignee_id":`+itoa(e.agentID)+`}`)
+	e.alice.expect(http.StatusCreated, "POST", url, `{"message":"Une question"}`)
+	if msg := lastNotif(e.agent); !strings.Contains(msg, "Une question") {
+		t.Errorf("l'agent assigné devrait être notifié : %q", msg)
+	}
+	if msg := lastNotif(e.agent2); strings.Contains(msg, "Une question") {
+		t.Error("un autre agent ne devrait pas être notifié")
+	}
+
+	// Le fil, dans l'ordre, et le compteur sur la demande
+	list := decode[[]Comment](t, e.alice.expect(http.StatusOK, "GET", url, ""))
+	if len(list) != 3 || list[0].AuthorName != "Awa Admin" || list[2].Message != "Une question" {
+		t.Errorf("fil inattendu : %+v", list)
+	}
+	if r, _ := getRequest(id); r.CommentCount != 3 {
+		t.Errorf("comment_count = %d, attendu 3", r.CommentCount)
+	}
+
+	// Bob ne voit pas la demande d'Alice, ni ses réponses
+	e.bob.expect(http.StatusNotFound, "GET", url, "")
+	e.bob.expect(http.StatusNotFound, "POST", url, `{"message":"Pirate"}`)
+
+	// Validation
+	e.admin.expect(http.StatusBadRequest, "POST", url, `{"message":"   "}`)
+	e.admin.expect(http.StatusBadRequest, "POST", url, `{"message":"`+strings.Repeat("a", commentMax+1)+`"}`)
+	e.admin.expect(http.StatusNotFound, "POST", "/requests/999/comments", `{"message":"Bonjour"}`)
+
+	// Supprimer la demande supprime ses réponses
+	e.admin.expect(http.StatusNoContent, "DELETE", "/requests/"+itoa(id), "")
+	var n int
+	db.QueryRow(`SELECT COUNT(*) FROM comments WHERE request_id = ?`, id).Scan(&n)
+	if n != 0 {
+		t.Errorf("%d réponses restantes après suppression", n)
+	}
+}
