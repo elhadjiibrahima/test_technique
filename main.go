@@ -18,6 +18,7 @@ func routes() http.Handler {
 	mux.HandleFunc("POST /auth/logout", logout)
 	mux.HandleFunc("GET /auth/me", requireAuth(me))
 	mux.HandleFunc("PUT /auth/password", requireAuth(changePassword))
+	mux.HandleFunc("PUT /auth/profile", requireAuth(updateProfile))
 	mux.HandleFunc("POST /auth/forgot", forgotPassword)
 	mux.HandleFunc("POST /auth/reset", resetPassword)
 

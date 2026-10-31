@@ -4,7 +4,8 @@ Petite application pour enregistrer des demandes internes et suivre leur avancem
 avec des comptes, des rôles et des notifications.
 
 Avec la page web, on peut :
-- créer un compte et se connecter
+- créer un compte (nom, poste, e-mail, mot de passe) et se connecter
+- compléter son profil (🪪 Mon profil) : nom, poste, téléphone, adresse
 - ajouter une demande (titre, description, priorité, catégorie, pièces jointes)
 - suivre où en est sa demande : ouverte, en cours ou terminée, et qui la traite
 - recevoir une notification (🔔) quand sa demande est prise en charge, change de statut ou reçoit une réponse
@@ -34,6 +35,15 @@ Avec la page web, on peut :
 | Gérer les comptes et les rôles | ❌ | ❌ | ✅ |
 
 Un compte créé depuis la page est toujours **employé**. Un admin peut ensuite le passer agent ou admin.
+
+## Le profil
+
+À l'inscription, chacun indique son **poste** (obligatoire). Ensuite, depuis le menu 👤 → **Mon profil**,
+on peut modifier son nom et son poste, et ajouter un **numéro de téléphone** et une **adresse**.
+L'e-mail et le rôle ne se changent pas depuis le profil.
+
+Le poste et le téléphone du demandeur s'affichent sur ses demandes pour les agents et les admins
+(le téléphone est cliquable pour appeler). L'admin les voit aussi dans la liste des utilisateurs.
 
 ## Priorité, catégorie, historique et pièces jointes
 
@@ -100,6 +110,7 @@ go test -v ./...
 - `events.go` : l'historique des demandes
 - `attachments.go` : les pièces jointes
 - `reset.go` : mot de passe oublié et liens de réinitialisation
+- `profile.go` : le profil (poste, téléphone, adresse) et leur contrôle de saisie
 - `model.go` : les structures (demande, utilisateur), les statuts et les rôles
 - `database.go` : la connexion à la base SQLite et la création des tables
 - `create.go` : ajouter une demande
@@ -115,11 +126,12 @@ go test -v ./...
 ## Les routes
 
 Comptes :
-- `POST /auth/register` : créer un compte (employé)
+- `POST /auth/register` : créer un compte employé (`name`, `job_title`, `email`, `password`)
 - `POST /auth/login` : se connecter
 - `POST /auth/logout` : se déconnecter
 - `GET /auth/me` : l'utilisateur connecté
 - `PUT /auth/password` : changer son mot de passe
+- `PUT /auth/profile` : modifier son profil (nom, poste, téléphone, adresse)
 - `POST /auth/forgot` : signaler un mot de passe oublié (prévient les admins)
 - `POST /auth/reset` : choisir un nouveau mot de passe avec le lien reçu
 
@@ -182,6 +194,7 @@ J'ai fait des tests automatiques pour vérifier, entre autres, que :
 - l'historique note chaque action, dans l'ordre, sans doublon
 - les pièces jointes refusent les faux types, les fichiers vides ou trop gros, et sont protégées comme les demandes
 - le lien de réinitialisation marche une seule fois, expire, et ferme les anciennes sessions
+- le poste est obligatoire à l'inscription ; le profil valide le téléphone et l'adresse, et ne permet pas de changer son rôle ou son e-mail
 - la pagination et les filtres marchent, et refusent les mauvais paramètres
 
 Pour les tests, j'utilise une base de données en mémoire. Comme ça, mes vraies données ne sont pas touchées.

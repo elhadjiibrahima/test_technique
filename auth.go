@@ -121,13 +121,10 @@ func currentUser(r *http.Request) (User, bool) {
 	if err != nil || c.Value == "" {
 		return User{}, false
 	}
-	var u User
-	err = db.QueryRow(
-		`SELECT u.id, u.name, u.email, u.role, u.created_at
-		 FROM sessions s JOIN users u ON u.id = s.user_id
-		 WHERE s.token_hash = ? AND s.expires_at > ?`,
-		hashToken(c.Value), time.Now(),
-	).Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt)
+	u, err := scanUser(db.QueryRow(
+		`SELECT `+userColumns+` FROM users WHERE id =
+		 (SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?)`,
+		hashToken(c.Value), time.Now()))
 	return u, err == nil
 }
 
@@ -279,14 +276,14 @@ func validatePassword(password string) string {
 var errEmailTaken = errors.New("email déjà utilisé")
 
 // createUser enregistre un nouvel utilisateur
-func createUser(name, email, password string, role Role) (User, error) {
+func createUser(name, email, password string, role Role, jobTitle string) (User, error) {
 	hash, err := hashPassword(password)
 	if err != nil {
 		return User{}, err
 	}
-	u := User{Name: name, Email: email, Role: role, CreatedAt: time.Now()}
-	res, err := db.Exec(`INSERT INTO users (name, email, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)`,
-		u.Name, u.Email, hash, u.Role, u.CreatedAt)
+	u := User{Name: name, Email: email, Role: role, CreatedAt: time.Now(), JobTitle: jobTitle}
+	res, err := db.Exec(`INSERT INTO users (name, email, password_hash, role, created_at, job_title) VALUES (?, ?, ?, ?, ?, ?)`,
+		u.Name, u.Email, hash, u.Role, u.CreatedAt, u.JobTitle)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return User{}, errEmailTaken
@@ -322,7 +319,7 @@ func ensureAdmin() error {
 	var stored string
 	err := db.QueryRow(`SELECT id, password_hash FROM users WHERE email = ?`, email).Scan(&id, &stored)
 	if errors.Is(err, sql.ErrNoRows) {
-		_, err = createUser(name, email, password, RoleAdmin)
+		_, err = createUser(name, email, password, RoleAdmin, "Administrateur")
 		if err == nil {
 			log.Println("Compte administrateur créé :", email)
 		}
@@ -343,6 +340,7 @@ type credentials struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	JobTitle string `json:"job_title"`
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -364,10 +362,14 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 	c.Name = strings.TrimSpace(c.Name)
 	c.Email = normalizeEmail(c.Email)
+	c.JobTitle = cleanText(c.JobTitle)
 
 	errs := map[string]string{}
 	if msg := validateName(c.Name); msg != "" {
 		errs["name"] = msg
+	}
+	if msg := validateJobTitle(c.JobTitle); msg != "" {
+		errs["job_title"] = msg
 	}
 	if msg := validateEmail(c.Email); msg != "" {
 		errs["email"] = msg
@@ -380,7 +382,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := createUser(c.Name, c.Email, c.Password, RoleEmploye)
+	u, err := createUser(c.Name, c.Email, c.Password, RoleEmploye, c.JobTitle)
 	if errors.Is(err, errEmailTaken) {
 		writeErrors(w, http.StatusConflict, map[string]string{
 			"email": "Un compte existe déjà avec cet e-mail.",
@@ -409,10 +411,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u User
+	u, err := getUserByEmail(email)
 	var stored string
-	err := db.QueryRow(`SELECT id, name, email, role, created_at, password_hash FROM users WHERE email = ?`, email).
-		Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt, &stored)
+	if err == nil {
+		err = db.QueryRow(`SELECT password_hash FROM users WHERE id = ?`, u.ID).Scan(&stored)
+	}
 	if err != nil {
 		checkPassword(c.Password, dummyHash) // même durée que si le compte existait
 	}

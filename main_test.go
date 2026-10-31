@@ -67,7 +67,7 @@ func setup(t *testing.T) *env {
 
 	e := &env{h: routes()}
 	mk := func(name, email string, role Role) (*client, int) {
-		u, err := createUser(name, email, "motdepasse", role)
+		u, err := createUser(name, email, "motdepasse", role, "Comptable")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +130,7 @@ func TestRegisterLoginLogout(t *testing.T) {
 	c.expect(http.StatusUnauthorized, "GET", "/requests", "")
 	c.expect(http.StatusBadRequest, "POST", "/auth/register", `{"name":"Zoé","email":"pas-un-email","password":"court"}`)
 
-	rec := c.expect(http.StatusCreated, "POST", "/auth/register", `{"name":"Zoé Martin","email":" Zoe@Test.GN ","password":"motdepasse"}`)
+	rec := c.expect(http.StatusCreated, "POST", "/auth/register", `{"name":"Zoé Martin","email":" Zoe@Test.GN ","password":"motdepasse","job_title":"Assistante RH"}`)
 	u := decode[User](t, rec)
 	if u.Role != RoleEmploye || u.Email != "zoe@test.gn" {
 		t.Errorf("inscription : %+v (un nouveau compte doit être employé)", u)
@@ -140,11 +140,11 @@ func TestRegisterLoginLogout(t *testing.T) {
 
 	// on ne peut pas s'inscrire en admin, ni deux fois avec le même e-mail
 	c2 := &client{t: t, h: e.h}
-	rec = c2.expect(http.StatusCreated, "POST", "/auth/register", `{"name":"Pirate","email":"p@test.gn","password":"motdepasse","role":"admin"}`)
+	rec = c2.expect(http.StatusCreated, "POST", "/auth/register", `{"name":"Pirate","email":"p@test.gn","password":"motdepasse","role":"admin","job_title":"Stagiaire"}`)
 	if decode[User](t, rec).Role != RoleEmploye {
 		t.Error("le rôle envoyé à l'inscription doit être ignoré")
 	}
-	c2.expect(http.StatusConflict, "POST", "/auth/register", `{"name":"Zoé","email":"zoe@test.gn","password":"motdepasse"}`)
+	c2.expect(http.StatusConflict, "POST", "/auth/register", `{"name":"Zoé","email":"zoe@test.gn","password":"motdepasse","job_title":"Stagiaire"}`)
 
 	c.expect(http.StatusNoContent, "POST", "/auth/logout", "")
 	c.expect(http.StatusUnauthorized, "GET", "/auth/me", "")
@@ -456,8 +456,8 @@ func TestGestionDesUtilisateurs(t *testing.T) {
 	e.agent.expect(http.StatusForbidden, "PATCH", "/requests/"+itoa(id), `{"status":"done"}`)
 
 	// Création d'un compte par l'admin
-	e.admin.expect(http.StatusCreated, "POST", "/users", `{"name":"Nouvel Agent","email":"na@test.gn","password":"motdepasse","role":"agent"}`)
-	e.admin.expect(http.StatusConflict, "POST", "/users", `{"name":"Doublon","email":"na@test.gn","password":"motdepasse","role":"agent"}`)
+	e.admin.expect(http.StatusCreated, "POST", "/users", `{"name":"Nouvel Agent","email":"na@test.gn","password":"motdepasse","role":"agent","job_title":"Technicien"}`)
+	e.admin.expect(http.StatusConflict, "POST", "/users", `{"name":"Doublon","email":"na@test.gn","password":"motdepasse","role":"agent","job_title":"Technicien"}`)
 
 	// Suppression : la session de l'utilisateur ne marche plus
 	e.admin.expect(http.StatusNoContent, "DELETE", "/users/"+itoa(e.agent2ID), "")
@@ -813,4 +813,74 @@ func TestMotDePasseOublie(t *testing.T) {
 	db.Exec(`UPDATE password_resets SET expires_at = ?`, time.Now().Add(-time.Minute))
 	anon.expect(http.StatusBadRequest, "POST", "/auth/reset",
 		`{"token":"`+strings.TrimPrefix(link3["path"].(string), "/?reset=")+`","password":"nouveaumdp2"}`)
+}
+
+// ---------- Poste et profil ----------
+
+func TestInscriptionAvecPoste(t *testing.T) {
+	e := setup(t)
+	c := &client{t: t, h: e.h}
+
+	rec := c.expect(http.StatusBadRequest, "POST", "/auth/register", `{"name":"Zoé","email":"zoe@test.gn","password":"motdepasse"}`)
+	if !strings.Contains(rec.Body.String(), "Le poste est obligatoire") {
+		t.Errorf("le poste doit être obligatoire : %s", rec.Body)
+	}
+	c.expect(http.StatusBadRequest, "POST", "/auth/register", `{"name":"Zoé","email":"zoe@test.gn","password":"motdepasse","job_title":"<script>"}`)
+
+	u := decode[User](t, c.expect(http.StatusCreated, "POST", "/auth/register",
+		`{"name":"Zoé","email":"zoe@test.gn","password":"motdepasse","job_title":"  Chef   de projet IT "}`))
+	if u.JobTitle != "Chef de projet IT" {
+		t.Errorf("poste : %q", u.JobTitle)
+	}
+	if me := decode[User](t, c.expect(http.StatusOK, "GET", "/auth/me", "")); me.JobTitle != "Chef de projet IT" {
+		t.Errorf("/auth/me : %+v", me)
+	}
+}
+
+func TestProfil(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Clavier")
+
+	u := decode[User](t, e.alice.expect(http.StatusOK, "PUT", "/auth/profile",
+		`{"name":"Alice Camara","job_title":"Comptable principale","phone":"+224 620 12 34 56","address":"Kaloum, Conakry"}`))
+	if u.Name != "Alice Camara" || u.JobTitle != "Comptable principale" || u.Phone != "+224 620 12 34 56" ||
+		u.Address != "Kaloum, Conakry" || u.Email != "alice@test.gn" || u.Role != RoleEmploye {
+		t.Errorf("profil : %+v", u)
+	}
+
+	// Le nouveau nom, le poste et le téléphone apparaissent sur ses demandes (vues par l'agent)
+	r := decode[Request](t, e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(id), `{"status":"in_progress"}`))
+	if r.Requester != "Alice Camara" || deref(r.RequesterJob) != "Comptable principale" || deref(r.RequesterTel) != "+224 620 12 34 56" {
+		t.Errorf("demande : %+v", r)
+	}
+
+	// On ne peut pas changer son rôle ni son e-mail par le profil
+	u = decode[User](t, e.alice.expect(http.StatusOK, "PUT", "/auth/profile",
+		`{"name":"Alice Camara","job_title":"Comptable","role":"admin","email":"pirate@test.gn"}`))
+	if u.Role != RoleEmploye || u.Email != "alice@test.gn" || u.Phone != "" {
+		t.Errorf("rôle/e-mail modifiés ou téléphone non effacé : %+v", u)
+	}
+
+	// Validation
+	for _, body := range []string{
+		`{"name":"","job_title":"Comptable"}`,
+		`{"name":"Alice","job_title":""}`,
+		`{"name":"Alice","job_title":"Comptable","phone":"abc"}`,
+		`{"name":"Alice","job_title":"Comptable","phone":"12"}`,
+		`{"name":"Alice","job_title":"Comptable","phone":"+224 6+20"}`,
+		`{"name":"Alice","job_title":"Comptable","address":"` + strings.Repeat("a", addressMax+1) + `"}`,
+	} {
+		e.alice.expect(http.StatusBadRequest, "PUT", "/auth/profile", body)
+	}
+
+	anon := &client{t: t, h: e.h}
+	anon.expect(http.StatusUnauthorized, "PUT", "/auth/profile", `{"name":"X","job_title":"Y"}`)
+
+	// L'admin voit le poste et le téléphone dans la liste des utilisateurs
+	e.alice.expect(http.StatusOK, "PUT", "/auth/profile", `{"name":"Alice","job_title":"Comptable","phone":"620123456"}`)
+	for _, usr := range decode[[]User](t, e.admin.expect(http.StatusOK, "GET", "/users", "")) {
+		if usr.ID == e.aliceID && (usr.Phone != "620123456" || usr.JobTitle != "Comptable") {
+			t.Errorf("liste admin : %+v", usr)
+		}
+	}
 }

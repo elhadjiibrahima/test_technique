@@ -576,6 +576,12 @@
     .lien-reset input { font-size: .8rem; }
     .lien-reset button { width: auto; flex-shrink: 0; padding: .5rem .8rem; }
 
+    .carte-profil { max-width: 640px; margin: 0 auto; }
+    input:disabled { opacity: .7; cursor: not-allowed; }
+    @media (max-width: 520px) { .deux-champs { grid-template-columns: 1fr; gap: 0; } }
+    .contact { color: var(--texte-doux); text-decoration: none; }
+    .contact:hover { text-decoration: underline; }
+
     /* ---------- Fenêtre mot de passe ---------- */
     dialog {
       border: 1px solid var(--bordure);
@@ -617,6 +623,7 @@
             <div class="notif-liste" id="notif-liste"></div>
           </div>
           <div class="panneau menu-compte" id="menu-compte" hidden>
+            <button type="button" id="ouvrir-profil">🪪 Mon profil</button>
             <button type="button" id="ouvrir-mdp">🔑 Changer mon mot de passe</button>
             <button type="button" id="deconnexion">🚪 Se déconnecter</button>
           </div>
@@ -644,6 +651,10 @@
         <div class="champ" id="champ-nom" hidden>
           <label for="auth-nom">Nom complet</label>
           <input id="auth-nom" autocomplete="name" maxlength="50" placeholder="Ex : Aminata Diallo">
+        </div>
+        <div class="champ" id="champ-poste" hidden>
+          <label for="auth-poste">Poste occupé</label>
+          <input id="auth-poste" list="postes" maxlength="80" autocomplete="organization-title" placeholder="Ex : Comptable, Chef de projet IT">
         </div>
         <div class="champ" id="champ-email">
           <label for="auth-email">E-mail</label>
@@ -743,6 +754,50 @@
       </div>
     </section>
 
+    <!-- ----- Vue Mon profil ----- -->
+    <div class="vue vue-utilisateurs" data-vue="profil" hidden>
+      <section class="carte carte-profil">
+        <div class="entete-form">
+          <h2>Mon profil</h2>
+          <button type="button" class="lien" id="retour-demandes">← Retour aux demandes</button>
+        </div>
+        <div id="info-profil" class="message-info" role="status"></div>
+        <div id="erreur-profil" class="message-erreur" role="alert"></div>
+        <form id="form-profil">
+          <div class="deux-champs">
+            <div class="champ">
+              <label for="profil-nom">Nom complet</label>
+              <input id="profil-nom" required minlength="2" maxlength="50" autocomplete="name">
+            </div>
+            <div class="champ">
+              <label for="profil-poste">Poste occupé</label>
+              <input id="profil-poste" list="postes" required minlength="2" maxlength="80" autocomplete="organization-title">
+            </div>
+          </div>
+          <div class="deux-champs">
+            <div class="champ">
+              <label for="profil-email">E-mail</label>
+              <input id="profil-email" disabled>
+            </div>
+            <div class="champ">
+              <label for="profil-role">Rôle</label>
+              <input id="profil-role" disabled>
+            </div>
+          </div>
+          <div class="champ">
+            <label for="profil-tel">Numéro de téléphone</label>
+            <input id="profil-tel" type="tel" maxlength="25" autocomplete="tel" placeholder="Ex : +224 620 00 00 00">
+          </div>
+          <div class="champ">
+            <label for="profil-adresse">Adresse</label>
+            <textarea id="profil-adresse" maxlength="200" autocomplete="street-address" placeholder="Ex : Quartier, commune, ville"></textarea>
+          </div>
+          <p class="aide" style="text-align:left;margin:-.25rem 0 1rem">Votre poste et votre téléphone sont visibles par les agents et les administrateurs, pour qu'ils puissent vous contacter au sujet de vos demandes. L'e-mail et le rôle ne peuvent être changés que par un administrateur.</p>
+          <button type="submit" id="btn-profil">Enregistrer mon profil</button>
+        </form>
+      </section>
+    </div>
+
     <!-- ----- Vue Utilisateurs (admin) ----- -->
     <div class="vue vue-utilisateurs" data-vue="utilisateurs" hidden>
       <div class="grille-admin">
@@ -753,6 +808,10 @@
             <div class="champ">
               <label for="nouveau-nom">Nom complet</label>
               <input id="nouveau-nom" required minlength="2" maxlength="50">
+            </div>
+            <div class="champ">
+              <label for="nouveau-poste">Poste</label>
+              <input id="nouveau-poste" list="postes" required minlength="2" maxlength="80">
             </div>
             <div class="champ">
               <label for="nouveau-email">E-mail</label>
@@ -815,6 +874,20 @@
     </div>
     <div class="boutons"><button type="button" class="secondaire" id="fermer-lien">Fermer</button></div>
   </dialog>
+
+  <datalist id="postes">
+    <option value="Assistant(e) administratif(ve)">
+    <option value="Comptable">
+    <option value="Chargé(e) des ressources humaines">
+    <option value="Chef de projet">
+    <option value="Commercial(e)">
+    <option value="Développeur(se)">
+    <option value="Directeur(rice)">
+    <option value="Ingénieur(e) informatique">
+    <option value="Responsable logistique">
+    <option value="Stagiaire">
+    <option value="Technicien(ne)">
+  </datalist>
 
   <div class="toast" id="toast"></div>
 
@@ -910,6 +983,8 @@
       $("mode-inscription").classList.toggle("actif", mode === "inscription");
       $("champ-nom").hidden = mode !== "inscription";
       $("auth-nom").required = mode === "inscription";
+      $("champ-poste").hidden = mode !== "inscription";
+      $("auth-poste").required = mode === "inscription";
       $("champ-email").hidden = mode === "reset";
       $("auth-email").required = mode !== "reset";
       $("champ-mdp").hidden = mode === "oubli";
@@ -965,7 +1040,10 @@
           return;
         }
         const donnees = { email: $("auth-email").value.trim(), password: $("auth-mdp").value };
-        if (modeAuth === "inscription") donnees.name = $("auth-nom").value.trim();
+        if (modeAuth === "inscription") {
+          donnees.name = $("auth-nom").value.trim();
+          donnees.job_title = $("auth-poste").value.trim();
+        }
         const reponse = await api("POST", modeAuth === "inscription" ? "/auth/register" : "/auth/login", donnees);
         $("form-auth").reset();
         cacher($("info-auth"));
@@ -1104,12 +1182,61 @@
       } catch (_) { /* on réessaiera au prochain passage */ }
     }
 
+
+    // ---------- Mon profil ----------
+
+    function remplirProfil() {
+      $("profil-nom").value = moi.name;
+      $("profil-poste").value = moi.job_title || "";
+      $("profil-email").value = moi.email;
+      $("profil-role").value = ROLES[moi.role] || moi.role;
+      $("profil-tel").value = moi.phone || "";
+      $("profil-adresse").value = moi.address || "";
+      cacher($("erreur-profil"));
+      cacher($("info-profil"));
+      if (!moi.job_title) {
+        $("info-profil").textContent = "Complétez votre profil : indiquez votre poste.";
+        $("info-profil").style.display = "block";
+      }
+    }
+
+    $("ouvrir-profil").addEventListener("click", () => {
+      fermerPanneaux();
+      changerVue("profil");
+    });
+    $("retour-demandes").addEventListener("click", () => changerVue("demandes"));
+
+    $("form-profil").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      cacher($("erreur-profil"));
+      cacher($("info-profil"));
+      $("btn-profil").disabled = true;
+      try {
+        moi = await (await api("PUT", "/auth/profile", {
+          name: $("profil-nom").value.trim(),
+          job_title: $("profil-poste").value.trim(),
+          phone: $("profil-tel").value.trim(),
+          address: $("profil-adresse").value.trim(),
+        })).json();
+        $("nom-utilisateur").textContent = moi.name;
+        remplirProfil();
+        $("info-profil").textContent = "Profil enregistré ✓";
+        $("info-profil").style.display = "block";
+        afficherToast("Profil enregistré ✓");
+      } catch (err) {
+        afficherErreur($("erreur-profil"), err);
+      } finally {
+        $("btn-profil").disabled = false;
+      }
+    });
+
     // ---------- Onglets (admin) ----------
 
     function changerVue(nom) {
       for (const v of document.querySelectorAll(".vue")) v.hidden = v.dataset.vue !== nom;
       for (const o of document.querySelectorAll(".onglet")) o.classList.toggle("actif", o.dataset.vue === nom);
       if (nom === "utilisateurs") chargerUtilisateurs();
+      else if (nom === "profil") remplirProfil();
       else if (moi) chargerTout(); // les agents ont pu changer : on réaffiche la liste
     }
     for (const o of document.querySelectorAll(".onglet")) {
@@ -1351,8 +1478,16 @@
         const date = new Date(d.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
         meta.innerHTML = "<span></span><span></span><span></span>";
         meta.children[0].textContent = "#" + d.id;
-        meta.children[1].textContent = "👤 " + d.requester;
+        meta.children[1].textContent = "👤 " + d.requester + (d.requester_job_title ? " · " + d.requester_job_title : "");
         meta.children[2].textContent = "🕒 " + date;
+        // Les agents et admins peuvent appeler le demandeur
+        if (d.requester_phone && moi.role !== "employe") {
+          const tel = document.createElement("a");
+          tel.className = "contact";
+          tel.href = "tel:" + d.requester_phone.replace(/[^0-9+]/g, "");
+          tel.textContent = "📞 " + d.requester_phone;
+          meta.insertBefore(tel, meta.children[2]);
+        }
 
         const actions = document.createElement("div");
         actions.className = "actions";
@@ -1730,7 +1865,7 @@
         const nom = document.createElement("strong");
         nom.textContent = u.name + (u.id === moi.id ? " (vous)" : "");
         const email = document.createElement("small");
-        email.textContent = u.email;
+        email.textContent = [u.job_title, u.email, u.phone].filter(Boolean).join(" · ");
         infos.append(nom, email);
         ligne.appendChild(infos);
 
@@ -1803,6 +1938,7 @@
         await api("POST", "/users", {
           name: $("nouveau-nom").value.trim(),
           email: $("nouveau-email").value.trim(),
+          job_title: $("nouveau-poste").value.trim(),
           password: $("nouveau-mdp").value,
           role: $("nouveau-role").value,
         });

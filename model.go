@@ -49,6 +49,19 @@ type User struct {
 	Email     string    `json:"email"`
 	Role      Role      `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
+	JobTitle  string    `json:"job_title"` // poste occupé, ex : « Comptable »
+	Phone     string    `json:"phone"`
+	Address   string    `json:"address"`
+}
+
+// Colonnes lues pour un utilisateur (jamais password_hash)
+const userColumns = `id, name, email, role, created_at, job_title, phone, address`
+
+// scanUser lit une ligne produite avec userColumns
+func scanUser(row interface{ Scan(...any) error }) (User, error) {
+	var u User
+	err := row.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt, &u.JobTitle, &u.Phone, &u.Address)
+	return u, err
 }
 
 type Request struct {
@@ -57,6 +70,8 @@ type Request struct {
 	Description  string    `json:"description"`
 	Requester    string    `json:"requester"`
 	RequesterID  *int      `json:"requester_id"`
+	RequesterJob *string   `json:"requester_job_title"` // poste du demandeur
+	RequesterTel *string   `json:"requester_phone"`     // téléphone du demandeur
 	AssigneeID   *int      `json:"assignee_id"`
 	AssigneeName *string   `json:"assignee_name"`
 	Status       Status    `json:"status"`

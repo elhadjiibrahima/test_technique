@@ -132,10 +132,7 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func getUserByEmail(email string) (User, error) {
-	var u User
-	err := db.QueryRow(`SELECT id, name, email, role, created_at FROM users WHERE email = ?`, email).
-		Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt)
-	return u, err
+	return scanUser(db.QueryRow(`SELECT `+userColumns+` FROM users WHERE email = ?`, email))
 }
 
 // notifyAdmins prévient tous les administrateurs

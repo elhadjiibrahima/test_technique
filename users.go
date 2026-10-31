@@ -10,7 +10,7 @@ import (
 // GET /users : liste des utilisateurs (admin)
 // GET /users?role=agent : seulement les agents (pour l'assignation)
 func listUsers(w http.ResponseWriter, r *http.Request, _ User) {
-	query := `SELECT id, name, email, role, created_at FROM users`
+	query := `SELECT ` + userColumns + ` FROM users`
 	args := []any{}
 	if role := Role(r.URL.Query().Get("role")); role != "" {
 		if !role.valid() {
@@ -29,8 +29,8 @@ func listUsers(w http.ResponseWriter, r *http.Request, _ User) {
 
 	users := []User{}
 	for rows.Next() {
-		var u User
-		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt); err != nil {
+		u, err := scanUser(rows)
+		if err != nil {
 			serverError(w)
 			return
 		}
@@ -50,8 +50,12 @@ func adminCreateUser(w http.ResponseWriter, r *http.Request, _ User) {
 	}
 	body.Name = strings.TrimSpace(body.Name)
 	body.Email = normalizeEmail(body.Email)
+	body.JobTitle = cleanText(body.JobTitle)
 
 	errs := map[string]string{}
+	if msg := validateJobTitle(body.JobTitle); msg != "" {
+		errs["job_title"] = msg
+	}
 	if msg := validateName(body.Name); msg != "" {
 		errs["name"] = msg
 	}
@@ -69,7 +73,7 @@ func adminCreateUser(w http.ResponseWriter, r *http.Request, _ User) {
 		return
 	}
 
-	u, err := createUser(body.Name, body.Email, body.Password, body.Role)
+	u, err := createUser(body.Name, body.Email, body.Password, body.Role, body.JobTitle)
 	if errors.Is(err, errEmailTaken) {
 		writeErrors(w, http.StatusConflict, map[string]string{"email": "Un compte existe déjà avec cet e-mail."})
 		return
@@ -157,10 +161,7 @@ var roleLabels = map[Role]string{
 }
 
 func getUser(id int) (User, error) {
-	var u User
-	err := db.QueryRow(`SELECT id, name, email, role, created_at FROM users WHERE id = ?`, id).
-		Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt)
-	return u, err
+	return scanUser(db.QueryRow(`SELECT `+userColumns+` FROM users WHERE id = ?`, id))
 }
 
 func userNotFound(w http.ResponseWriter) {
