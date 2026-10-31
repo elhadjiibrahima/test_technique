@@ -2,7 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"log"
+	"os"
+	"strings"
 
 	_ "modernc.org/sqlite" // pilote SQLite (pur Go, sans compilateur C)
 )
@@ -10,25 +11,80 @@ import (
 // Connexion à la base (partagée par toutes les fonctions)
 var db *sql.DB
 
-// initDB ouvre le fichier demandes.db et crée la table si elle n'existe pas
-func initDB() {
+// dbPath renvoie le chemin du fichier de base.
+// On peut le changer avec la variable d'environnement DB_PATH
+// (utile sur un hébergeur pour mettre la base sur un disque persistant).
+func dbPath() string {
+	if p := os.Getenv("DB_PATH"); p != "" {
+		return p
+	}
+	return "demandes.db"
+}
+
+const schema = `
+CREATE TABLE IF NOT EXISTS users (
+	id            INTEGER PRIMARY KEY AUTOINCREMENT,
+	name          TEXT NOT NULL,
+	email         TEXT NOT NULL UNIQUE,
+	password_hash TEXT NOT NULL,
+	role          TEXT NOT NULL,
+	created_at    TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+	token_hash TEXT PRIMARY KEY,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	expires_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS requests (
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	title       TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	requester   TEXT NOT NULL,
+	status      TEXT NOT NULL,
+	created_at  TIMESTAMP NOT NULL,
+	updated_at  TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	request_id INTEGER,
+	message    TEXT NOT NULL,
+	is_read    INTEGER NOT NULL DEFAULT 0,
+	created_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);
+`
+
+// Colonnes ajoutées après la première version : on les ajoute aux bases
+// existantes pour ne pas perdre les anciennes demandes.
+var migrations = []string{
+	`ALTER TABLE requests ADD COLUMN requester_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+	`ALTER TABLE requests ADD COLUMN assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+}
+
+// initDB ouvre la base et crée les tables si elles n'existent pas.
+// Pour les tests, on passe ":memory:" pour avoir une base vide en mémoire.
+func initDB(path string) error {
 	var err error
-	db, err = sql.Open("sqlite", "demandes.db")
+	db, err = sql.Open("sqlite", path)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	db.SetMaxOpenConns(1) // SQLite n'accepte qu'une écriture à la fois
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS requests (
-		id          INTEGER PRIMARY KEY AUTOINCREMENT,
-		title       TEXT NOT NULL,
-		description TEXT NOT NULL DEFAULT '',
-		requester   TEXT NOT NULL,
-		status      TEXT NOT NULL,
-		created_at  TIMESTAMP NOT NULL,
-		updated_at  TIMESTAMP NOT NULL
-	)`)
-	if err != nil {
-		log.Fatal(err)
+	if _, err = db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
+		return err
 	}
+	if _, err = db.Exec(schema); err != nil {
+		return err
+	}
+	for _, m := range migrations {
+		if _, err := db.Exec(m); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			return err
+		}
+	}
+	return nil
 }

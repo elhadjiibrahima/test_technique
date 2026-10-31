@@ -243,146 +243,821 @@
       border-radius: 12px;
       box-shadow: var(--ombre);
       font-weight: 600;
-      transform: translateY(150%);
-      transition: transform .3s ease;
+      transform: translateY(calc(100% + 2rem));
+      visibility: hidden;
+      transition: transform .3s ease, visibility .3s;
+      max-width: calc(100vw - 3rem);
+      z-index: 30;
     }
-    .toast.visible { transform: translateY(0); }
+    .toast.visible { transform: translateY(0); visibility: visible; }
 
     @keyframes apparition {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+    /* ---------- Modification / suppression ---------- */
+    .entete-form {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .entete-form h2 { margin: 0; }
+    .lien {
+      width: auto;
+      background: none;
+      color: var(--texte-doux);
+      padding: .2rem .4rem;
+      font-size: .8rem;
+      font-weight: 600;
+      border-radius: 6px;
+    }
+    .lien:hover { background: var(--bordure); color: var(--texte); }
+    .carte.edition { outline: 2px solid var(--primaire); outline-offset: -1px; }
+
+    .actions { display: flex; gap: .25rem; }
+    .btn-icone {
+      width: auto;
+      background: none;
+      color: var(--texte-doux);
+      padding: .25rem .45rem;
+      font-size: .78rem;
+      font-weight: 600;
+      border: 1.5px solid var(--bordure);
+      border-radius: 8px;
+    }
+    .btn-icone:hover { background: var(--bg); color: var(--texte); }
+    .btn-icone.danger:hover { border-color: var(--erreur); color: var(--erreur); background: var(--erreur-fond); }
+    .message-erreur ul { padding-left: 1.1rem; }
+
+    /* ---------- Filtres (compteurs cliquables) ---------- */
+    .compteur {
+      width: auto;
+      border: 2px solid transparent;
+      cursor: pointer;
+      font-weight: normal;
+    }
+    .compteur.open:hover { background: var(--ouvert-fond); }
+    .compteur.in_progress:hover { background: var(--encours-fond); }
+    .compteur.done:hover { background: var(--termine-fond); }
+    .compteur.actif { border-color: currentColor; }
+
+    /* ---------- Pagination ---------- */
+    .pagination {
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+      font-size: .85rem;
+      color: var(--texte-doux);
+    }
+    .pagination button { width: auto; padding: .45rem .9rem; font-size: .85rem; }
+    .pagination button:disabled { opacity: .35; cursor: default; }
+
+    /* ---------- En-tête : utilisateur et notifications ---------- */
+    .barre {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .zone-utilisateur { display: flex; align-items: center; gap: .5rem; position: relative; }
+    .zone-utilisateur[hidden] { display: none; }
+    .qui { text-align: right; line-height: 1.25; }
+    .qui strong { display: block; }
+    .role {
+      display: inline-block;
+      font-size: .68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: rgba(255, 255, 255, .2);
+      padding: .1rem .5rem;
+      border-radius: 999px;
+    }
+    .btn-entete {
+      width: auto;
+      background: rgba(255, 255, 255, .15);
+      border: 1px solid rgba(255, 255, 255, .3);
+      padding: .45rem .7rem;
+      font-size: .85rem;
+      position: relative;
+    }
+    .btn-entete:hover { background: rgba(255, 255, 255, .28); }
+    .pastille {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: white;
+      font-size: .7rem;
+      font-weight: 700;
+      line-height: 20px;
+      text-align: center;
+    }
+    .pastille[hidden] { display: none; }
+
+    .panneau {
+      position: absolute;
+      top: calc(100% + .5rem);
+      right: 0;
+      width: min(360px, 92vw);
+      background: var(--carte);
+      color: var(--texte);
+      border: 1px solid var(--bordure);
+      border-radius: 14px;
+      box-shadow: var(--ombre);
+      z-index: 20;
+      overflow: hidden;
+    }
+    .panneau[hidden] { display: none; }
+    .panneau h3 { font-size: .9rem; padding: .8rem 1rem; border-bottom: 1px solid var(--bordure); }
+    .notif-liste { max-height: 360px; overflow-y: auto; }
+    .notif { padding: .7rem 1rem; border-bottom: 1px solid var(--bordure); font-size: .85rem; }
+    .notif.non-lue { background: var(--ouvert-fond); }
+    .notif small { display: block; color: var(--texte-doux); margin-top: .15rem; }
+    .notif-vide { padding: 1.5rem 1rem; text-align: center; color: var(--texte-doux); font-size: .85rem; }
+    .menu-compte button {
+      display: block;
+      width: 100%;
+      background: none;
+      color: var(--texte);
+      text-align: left;
+      border-radius: 0;
+      padding: .75rem 1rem;
+      font-weight: 500;
+    }
+    .menu-compte button:hover { background: var(--bg); }
+
+    /* ---------- Onglets ---------- */
+    .onglets { display: flex; gap: .5rem; margin-top: 1.25rem; }
+    .onglets[hidden] { display: none; }
+    .onglet {
+      width: auto;
+      background: rgba(255, 255, 255, .15);
+      padding: .45rem 1rem;
+      font-size: .85rem;
+    }
+    .onglet:hover { background: rgba(255, 255, 255, .28); }
+    .onglet.actif { background: white; color: var(--primaire); }
+
+    /* ---------- Écran de connexion ---------- */
+    .ecran-connexion {
+      max-width: 420px;
+      margin: -4rem auto 3rem;
+      padding: 0 1.5rem;
+    }
+    .ecran-connexion[hidden], main[hidden], .vue[hidden] { display: none; }
+    .bascule { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem; background: var(--bg); padding: .25rem; border-radius: 12px; margin-bottom: 1.25rem; }
+    .bascule button { background: none; color: var(--texte-doux); padding: .55rem; }
+    .bascule button:hover { background: var(--bordure); }
+    .bascule button.actif { background: var(--carte); color: var(--texte); box-shadow: var(--ombre); }
+    .aide { font-size: .78rem; color: var(--texte-doux); margin-top: .9rem; text-align: center; }
+
+    /* ---------- Traitement ---------- */
+    .filtres-agent { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filtres-agent[hidden] { display: none; }
+    .puce {
+      width: auto;
+      background: var(--bg);
+      color: var(--texte-doux);
+      border: 1.5px solid var(--bordure);
+      padding: .3rem .75rem;
+      font-size: .8rem;
+      border-radius: 999px;
+    }
+    .puce:hover { background: var(--bordure); color: var(--texte); }
+    .puce.actif { background: var(--primaire); border-color: var(--primaire); color: white; }
+    .traitant { font-size: .8rem; color: var(--texte-doux); margin-top: .35rem; }
+    .traitant strong { color: var(--texte); }
+    .btn-prendre { border-color: var(--primaire); color: var(--primaire); }
+    .btn-prendre:hover { background: var(--primaire); color: white; }
+    select.petit {
+      font: inherit;
+      font-size: .78rem;
+      color: var(--texte);
+      background: var(--bg);
+      border: 1.5px solid var(--bordure);
+      border-radius: 8px;
+      padding: .25rem .5rem;
+    }
+
+    /* ---------- Utilisateurs (admin) ---------- */
+    .vue-utilisateurs { grid-column: 1 / -1; }
+    .grille-admin { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+    @media (max-width: 820px) { .grille-admin { grid-template-columns: 1fr; } }
+    .ligne-user {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .75rem 0;
+      border-bottom: 1px solid var(--bordure);
+      flex-wrap: wrap;
+    }
+    .ligne-user .infos { flex: 1; min-width: 160px; }
+    .ligne-user .infos small { display: block; color: var(--texte-doux); }
+    input, select#nouveau-role { font: inherit; }
+    select#nouveau-role {
+      width: 100%;
+      color: var(--texte);
+      background: var(--bg);
+      border: 1.5px solid var(--bordure);
+      border-radius: 10px;
+      padding: .65rem .8rem;
+    }
+
+    /* ---------- Fenêtre mot de passe ---------- */
+    dialog {
+      border: 1px solid var(--bordure);
+      border-radius: 16px;
+      padding: 1.5rem;
+      width: min(400px, 92vw);
+      background: var(--carte);
+      color: var(--texte);
+      box-shadow: var(--ombre);
+      margin: auto;
+    }
+    dialog::backdrop { background: rgba(15, 23, 42, .5); }
+    .boutons { display: flex; gap: .5rem; }
+    .boutons .secondaire { background: var(--bg); color: var(--texte); border: 1.5px solid var(--bordure); }
   </style>
 </head>
 <body>
 
   <header>
     <div class="conteneur">
-      <h1>Demandes internes</h1>
-      <p>Enregistrez et suivez les demandes de l'équipe.</p>
+      <div class="barre">
+        <div>
+          <h1>Demandes internes</h1>
+          <p>Enregistrez et suivez les demandes de l'équipe.</p>
+        </div>
+
+        <div class="zone-utilisateur" id="zone-utilisateur" hidden>
+          <div class="qui">
+            <strong id="nom-utilisateur"></strong>
+            <span class="role" id="role-utilisateur"></span>
+          </div>
+          <button type="button" class="btn-entete" id="btn-notifs" aria-label="Notifications">
+            🔔<span class="pastille" id="pastille" hidden>0</span>
+          </button>
+          <button type="button" class="btn-entete" id="btn-compte" aria-label="Mon compte">👤 ▾</button>
+
+          <div class="panneau" id="panneau-notifs" hidden>
+            <h3>Notifications</h3>
+            <div class="notif-liste" id="notif-liste"></div>
+          </div>
+          <div class="panneau menu-compte" id="menu-compte" hidden>
+            <button type="button" id="ouvrir-mdp">🔑 Changer mon mot de passe</button>
+            <button type="button" id="deconnexion">🚪 Se déconnecter</button>
+          </div>
+        </div>
+      </div>
+
+      <nav class="onglets" id="onglets" hidden>
+        <button type="button" class="onglet actif" data-vue="demandes">Demandes</button>
+        <button type="button" class="onglet" data-vue="utilisateurs">Utilisateurs</button>
+      </nav>
     </div>
   </header>
 
-  <main>
-    <!-- Formulaire -->
-    <section class="carte">
-      <h2>Nouvelle demande</h2>
-      <div id="erreur" class="message-erreur"></div>
+  <!-- ========== Connexion / inscription ========== -->
+  <section class="ecran-connexion" id="ecran-connexion" hidden>
+    <div class="carte">
+      <div class="bascule">
+        <button type="button" class="actif" id="mode-connexion">Se connecter</button>
+        <button type="button" id="mode-inscription">Créer un compte</button>
+      </div>
+      <div id="erreur-auth" class="message-erreur" role="alert"></div>
+      <form id="form-auth">
+        <div class="champ" id="champ-nom" hidden>
+          <label for="auth-nom">Nom complet</label>
+          <input id="auth-nom" autocomplete="name" maxlength="50" placeholder="Ex : Aminata Diallo">
+        </div>
+        <div class="champ">
+          <label for="auth-email">E-mail</label>
+          <input id="auth-email" type="email" autocomplete="email" required placeholder="vous@exemple.com">
+        </div>
+        <div class="champ">
+          <label for="auth-mdp">Mot de passe</label>
+          <input id="auth-mdp" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="8 caractères minimum">
+        </div>
+        <button type="submit" id="btn-auth">Se connecter</button>
+      </form>
+      <p class="aide" id="aide-auth">Les nouveaux comptes sont des comptes employés. Un administrateur peut ensuite vous donner le rôle d'agent.</p>
+    </div>
+  </section>
+
+  <!-- ========== Application ========== -->
+  <main id="app" hidden>
+
+    <!-- ----- Vue Demandes ----- -->
+    <section class="carte vue" id="carte-form" data-vue="demandes">
+      <div class="entete-form">
+        <h2 id="titre-form">Nouvelle demande</h2>
+        <button type="button" class="lien" id="annuler" hidden>Annuler</button>
+      </div>
+      <div id="erreur" class="message-erreur" role="alert"></div>
       <form id="formulaire">
         <div class="champ">
           <label for="title">Titre</label>
-          <input id="title" placeholder="Ex : Nouvel écran" required>
-        </div>
-        <div class="champ">
-          <label for="requester">Votre nom</label>
-          <input id="requester" placeholder="Ex : Alice" required>
+          <input id="title" placeholder="Ex : Nouvel écran" required minlength="3" maxlength="100">
         </div>
         <div class="champ">
           <label for="description">Description</label>
-          <textarea id="description" placeholder="Détails (optionnel)"></textarea>
+          <textarea id="description" placeholder="Détails (optionnel)" maxlength="500"></textarea>
         </div>
         <button type="submit" id="bouton">Envoyer la demande</button>
       </form>
     </section>
 
-    <!-- Liste -->
-    <section class="carte">
+    <section class="carte vue" data-vue="demandes">
       <div class="compteurs">
-        <div class="compteur open"><strong id="n-open">0</strong><span>Ouvertes</span></div>
-        <div class="compteur in_progress"><strong id="n-in_progress">0</strong><span>En cours</span></div>
-        <div class="compteur done"><strong id="n-done">0</strong><span>Terminées</span></div>
+        <button type="button" class="compteur open" data-statut="open" title="Afficher seulement les demandes ouvertes"><strong id="n-open">0</strong><span>Ouvertes</span></button>
+        <button type="button" class="compteur in_progress" data-statut="in_progress" title="Afficher seulement les demandes en cours"><strong id="n-in_progress">0</strong><span>En cours</span></button>
+        <button type="button" class="compteur done" data-statut="done" title="Afficher seulement les demandes terminées"><strong id="n-done">0</strong><span>Terminées</span></button>
+      </div>
+
+      <div class="filtres-agent" id="filtres-agent" hidden>
+        <button type="button" class="puce actif" data-assignee="">Toutes</button>
+        <button type="button" class="puce" data-assignee="me">Mes demandes à traiter (<span id="n-mine">0</span>)</button>
+        <button type="button" class="puce" data-assignee="none">Non assignées</button>
       </div>
 
       <div class="entete-liste">
-        <h2>Demandes enregistrées</h2>
+        <h2 id="titre-liste">Demandes enregistrées</h2>
         <span class="total" id="total"></span>
       </div>
       <div id="liste"></div>
+
+      <div class="pagination" id="pagination">
+        <button type="button" id="precedent">← Précédent</button>
+        <span id="info-page"></span>
+        <button type="button" id="suivant">Suivant →</button>
+      </div>
     </section>
+
+    <!-- ----- Vue Utilisateurs (admin) ----- -->
+    <div class="vue vue-utilisateurs" data-vue="utilisateurs" hidden>
+      <div class="grille-admin">
+        <section class="carte">
+          <h2>Ajouter un utilisateur</h2>
+          <div id="erreur-user" class="message-erreur" role="alert"></div>
+          <form id="form-user">
+            <div class="champ">
+              <label for="nouveau-nom">Nom complet</label>
+              <input id="nouveau-nom" required minlength="2" maxlength="50">
+            </div>
+            <div class="champ">
+              <label for="nouveau-email">E-mail</label>
+              <input id="nouveau-email" type="email" required>
+            </div>
+            <div class="champ">
+              <label for="nouveau-mdp">Mot de passe provisoire</label>
+              <input id="nouveau-mdp" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
+            </div>
+            <div class="champ">
+              <label for="nouveau-role">Rôle</label>
+              <select id="nouveau-role">
+                <option value="employe">Employé : crée et suit ses demandes</option>
+                <option value="agent">Agent : traite les demandes</option>
+                <option value="admin">Administrateur : tout gérer</option>
+              </select>
+            </div>
+            <button type="submit">Créer le compte</button>
+          </form>
+        </section>
+
+        <section class="carte">
+          <div class="entete-liste">
+            <h2>Utilisateurs</h2>
+            <span class="total" id="total-users"></span>
+          </div>
+          <div id="liste-users"></div>
+        </section>
+      </div>
+    </div>
   </main>
 
-  <div class="toast" id="toast">Demande enregistrée ✓</div>
+  <!-- Fenêtre : changer de mot de passe -->
+  <dialog id="dialog-mdp">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem">Changer mon mot de passe</h2>
+    <div id="erreur-mdp" class="message-erreur" role="alert"></div>
+    <form id="form-mdp">
+      <div class="champ">
+        <label for="mdp-actuel">Mot de passe actuel</label>
+        <input id="mdp-actuel" type="password" required autocomplete="current-password">
+      </div>
+      <div class="champ">
+        <label for="mdp-nouveau">Nouveau mot de passe</label>
+        <input id="mdp-nouveau" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
+      </div>
+      <div class="boutons">
+        <button type="button" class="secondaire" id="fermer-mdp">Annuler</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
 
   <script>
     const LIBELLES = { open: "Ouverte", in_progress: "En cours", done: "Terminée" };
+    const FILTRES = { open: "Demandes ouvertes", in_progress: "Demandes en cours", done: "Demandes terminées" };
+    const ROLES = { employe: "Employé", agent: "Agent", admin: "Administrateur" };
+    const PAR_PAGE = 5;
+    const $ = (id) => document.getElementById(id);
 
-    const formulaire = document.getElementById("formulaire");
-    const bouton = document.getElementById("bouton");
-    const zoneErreur = document.getElementById("erreur");
+    // État de la page
+    let moi = null;          // utilisateur connecté
+    let agents = [];         // pour l'admin : liste des agents (assignation)
+    let page = 1;
+    let filtre = "";         // "" = tous les statuts
+    let filtreAgent = "";    // "", "me" ou "none"
+    let enEdition = null;    // demande en cours de modification
+    let minuteurNotifs = null;
 
-    // Envoi du formulaire -> POST /requests
-    formulaire.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      zoneErreur.style.display = "none";
-      bouton.disabled = true;
-      bouton.textContent = "Envoi...";
+    // ---------- Appels au serveur ----------
 
-      try {
-        const reponse = await fetch("/requests", {
-          method: "POST",
-          body: JSON.stringify({
-            title: document.getElementById("title").value.trim(),
-            requester: document.getElementById("requester").value.trim(),
-            description: document.getElementById("description").value.trim(),
-          }),
-        });
-        if (!reponse.ok) {
-          throw new Error(await reponse.text());
+    // api envoie une requête et lève une erreur lisible si le serveur refuse.
+    // L'en-tête X-Requested-With est exigé par le serveur (protection CSRF).
+    async function api(methode, url, donnees) {
+      const options = { method: methode, headers: { "X-Requested-With": "fetch" } };
+      if (donnees !== undefined) {
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(donnees);
+      }
+      const reponse = await fetch(url, options);
+      if (reponse.status === 401 && moi && !url.startsWith("/auth/")) {
+        // session expirée : retour à l'écran de connexion
+        afficherConnexion();
+        throw new Error("Votre session a expiré, reconnectez-vous.");
+      }
+      if (!reponse.ok) {
+        let messages = ["Erreur " + reponse.status];
+        try {
+          const corps = await reponse.json();
+          if (corps.errors) messages = Object.values(corps.errors);
+        } catch (_) { /* réponse non JSON */ }
+        const erreur = new Error(messages.join(" "));
+        erreur.messages = messages;
+        throw erreur;
+      }
+      return reponse;
+    }
+
+    function afficherErreur(zone, err) {
+      const messages = err.messages || [err.message || "Une erreur est survenue."];
+      zone.innerHTML = "";
+      if (messages.length === 1) {
+        zone.textContent = messages[0];
+      } else {
+        const ul = document.createElement("ul");
+        for (const m of messages) {
+          const li = document.createElement("li");
+          li.textContent = m;
+          ul.appendChild(li);
         }
-        formulaire.reset();
-        afficherToast();
-        chargerListe();
+        zone.appendChild(ul);
+      }
+      zone.style.display = "block";
+    }
+
+    function cacher(zone) { zone.style.display = "none"; }
+
+    // ---------- Connexion / inscription ----------
+
+    let modeInscription = false;
+
+    function choisirMode(inscription) {
+      modeInscription = inscription;
+      $("mode-connexion").classList.toggle("actif", !inscription);
+      $("mode-inscription").classList.toggle("actif", inscription);
+      $("champ-nom").hidden = !inscription;
+      $("auth-nom").required = inscription;
+      $("auth-mdp").autocomplete = inscription ? "new-password" : "current-password";
+      $("btn-auth").textContent = inscription ? "Créer mon compte" : "Se connecter";
+      cacher($("erreur-auth"));
+    }
+    $("mode-connexion").addEventListener("click", () => choisirMode(false));
+    $("mode-inscription").addEventListener("click", () => choisirMode(true));
+
+    $("form-auth").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      cacher($("erreur-auth"));
+      $("btn-auth").disabled = true;
+      try {
+        const donnees = { email: $("auth-email").value.trim(), password: $("auth-mdp").value };
+        if (modeInscription) donnees.name = $("auth-nom").value.trim();
+        const reponse = await api("POST", modeInscription ? "/auth/register" : "/auth/login", donnees);
+        $("form-auth").reset();
+        demarrer(await reponse.json());
       } catch (err) {
-        zoneErreur.textContent = err.message || "Erreur lors de l'envoi";
-        zoneErreur.style.display = "block";
+        afficherErreur($("erreur-auth"), err);
       } finally {
-        bouton.disabled = false;
-        bouton.textContent = "Envoyer la demande";
+        $("btn-auth").disabled = false;
       }
     });
 
-    // Chargement de la liste -> GET /requests
-    async function chargerListe() {
-      const reponse = await fetch("/requests");
-      const demandes = await reponse.json();
-      afficherCompteurs(demandes);
-      afficherListe(demandes);
+    function afficherConnexion() {
+      moi = null;
+      clearInterval(minuteurNotifs);
+      $("app").hidden = true;
+      $("zone-utilisateur").hidden = true;
+      $("onglets").hidden = true;
+      $("ecran-connexion").hidden = false;
+      fermerPanneaux();
     }
 
-    function afficherCompteurs(demandes) {
-      for (const statut of ["open", "in_progress", "done"]) {
-        document.getElementById("n-" + statut).textContent =
-          demandes.filter((d) => d.status === statut).length;
+    // demarrer affiche l'application pour l'utilisateur connecté
+    function demarrer(utilisateur) {
+      moi = utilisateur;
+      page = 1; filtre = ""; filtreAgent = "";
+      quitterEdition();
+      $("ecran-connexion").hidden = true;
+      $("app").hidden = false;
+      $("zone-utilisateur").hidden = false;
+      $("nom-utilisateur").textContent = moi.name;
+      $("role-utilisateur").textContent = ROLES[moi.role] || moi.role;
+      $("onglets").hidden = moi.role !== "admin";
+      $("filtres-agent").hidden = !peutTraiter();
+      majFiltres();
+
+      // L'admin a besoin de la liste des agents avant d'afficher les demandes
+      (moi.role === "admin" ? chargerAgents() : Promise.resolve()).then(() => changerVue("demandes"));
+      chargerNotifications();
+      clearInterval(minuteurNotifs);
+      minuteurNotifs = setInterval(() => { chargerNotifications(); chargerCompteurs(); }, 15000);
+    }
+
+    const peutTraiter = () => moi && (moi.role === "agent" || moi.role === "admin");
+
+    // ---------- Menu du compte ----------
+
+    function fermerPanneaux() {
+      $("panneau-notifs").hidden = true;
+      $("menu-compte").hidden = true;
+    }
+    $("btn-compte").addEventListener("click", (e) => {
+      e.stopPropagation();
+      const ouvert = !$("menu-compte").hidden;
+      fermerPanneaux();
+      $("menu-compte").hidden = ouvert;
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".panneau")) fermerPanneaux();
+    });
+
+    $("deconnexion").addEventListener("click", async () => {
+      try { await api("POST", "/auth/logout"); } catch (_) {}
+      afficherConnexion();
+    });
+
+    $("ouvrir-mdp").addEventListener("click", () => {
+      fermerPanneaux();
+      $("form-mdp").reset();
+      cacher($("erreur-mdp"));
+      $("dialog-mdp").showModal();
+    });
+    $("fermer-mdp").addEventListener("click", () => $("dialog-mdp").close());
+    $("form-mdp").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api("PUT", "/auth/password", {
+          current_password: $("mdp-actuel").value,
+          new_password: $("mdp-nouveau").value,
+        });
+        $("dialog-mdp").close();
+        afficherToast("Mot de passe changé ✓");
+      } catch (err) {
+        afficherErreur($("erreur-mdp"), err);
       }
-      document.getElementById("total").textContent =
-        demandes.length + (demandes.length > 1 ? " demandes" : " demande");
+    });
+
+    // ---------- Notifications ----------
+
+    $("btn-notifs").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const ouvert = !$("panneau-notifs").hidden;
+      fermerPanneaux();
+      if (ouvert) return;
+      $("panneau-notifs").hidden = false;
+      await chargerNotifications();
+      // Ouvrir le panneau = tout marquer comme lu
+      if (Number($("pastille").textContent) > 0) {
+        try { await api("POST", "/notifications/read"); } catch (_) {}
+        $("pastille").hidden = true;
+      }
+    });
+
+    async function chargerNotifications() {
+      if (!moi) return;
+      try {
+        const data = await (await api("GET", "/notifications")).json();
+        $("pastille").textContent = data.unread > 9 ? "9+" : data.unread;
+        $("pastille").hidden = data.unread === 0;
+
+        const liste = $("notif-liste");
+        liste.innerHTML = "";
+        if (data.items.length === 0) {
+          liste.innerHTML = '<div class="notif-vide">Aucune notification pour le moment.</div>';
+          return;
+        }
+        for (const n of data.items) {
+          const div = document.createElement("div");
+          div.className = "notif" + (n.read ? "" : " non-lue");
+          div.textContent = n.message;
+          const date = document.createElement("small");
+          date.textContent = new Date(n.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+          div.appendChild(date);
+          liste.appendChild(div);
+        }
+      } catch (_) { /* on réessaiera au prochain passage */ }
+    }
+
+    // ---------- Onglets (admin) ----------
+
+    function changerVue(nom) {
+      for (const v of document.querySelectorAll(".vue")) v.hidden = v.dataset.vue !== nom;
+      for (const o of document.querySelectorAll(".onglet")) o.classList.toggle("actif", o.dataset.vue === nom);
+      if (nom === "utilisateurs") chargerUtilisateurs();
+      else if (moi) chargerTout(); // les agents ont pu changer : on réaffiche la liste
+    }
+    for (const o of document.querySelectorAll(".onglet")) {
+      o.addEventListener("click", () => changerVue(o.dataset.vue));
+    }
+
+    // ---------- Formulaire : créer ou modifier une demande ----------
+
+    $("formulaire").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      cacher($("erreur"));
+      $("bouton").disabled = true;
+      $("bouton").textContent = "Envoi...";
+
+      const donnees = {
+        title: $("title").value.trim(),
+        description: $("description").value.trim(),
+      };
+
+      try {
+        if (enEdition) {
+          await api("PUT", "/requests/" + enEdition.id, donnees);
+          afficherToast("Demande modifiée ✓");
+        } else {
+          await api("POST", "/requests", donnees);
+          afficherToast("Demande enregistrée ✓");
+          page = 1;
+        }
+        quitterEdition();
+        chargerTout();
+      } catch (err) {
+        afficherErreur($("erreur"), err);
+      } finally {
+        $("bouton").disabled = false;
+        $("bouton").textContent = enEdition ? "Enregistrer les modifications" : "Envoyer la demande";
+      }
+    });
+
+    function commencerEdition(d) {
+      enEdition = d;
+      $("title").value = d.title;
+      $("description").value = d.description || "";
+      $("titre-form").textContent = "Modifier la demande #" + d.id;
+      $("bouton").textContent = "Enregistrer les modifications";
+      $("annuler").hidden = false;
+      cacher($("erreur"));
+      $("carte-form").classList.add("edition");
+      $("carte-form").scrollIntoView({ behavior: "smooth", block: "start" });
+      $("title").focus({ preventScroll: true });
+    }
+
+    function quitterEdition() {
+      enEdition = null;
+      $("formulaire").reset();
+      $("titre-form").textContent = "Nouvelle demande";
+      $("bouton").textContent = "Envoyer la demande";
+      $("annuler").hidden = true;
+      $("carte-form").classList.remove("edition");
+    }
+
+    $("annuler").addEventListener("click", () => { quitterEdition(); cacher($("erreur")); });
+
+    // ---------- Liste, compteurs, filtres et pagination ----------
+
+    function chargerTout() {
+      chargerCompteurs();
+      chargerListe();
+    }
+
+    async function chargerCompteurs() {
+      if (!moi) return;
+      try {
+        const stats = await (await api("GET", "/requests/stats")).json();
+        for (const statut of ["open", "in_progress", "done"]) {
+          $("n-" + statut).textContent = stats[statut];
+        }
+        $("n-mine").textContent = stats.mine;
+      } catch (_) {}
+    }
+
+    async function chargerListe() {
+      let url = "/requests?page=" + page + "&limit=" + PAR_PAGE;
+      if (filtre) url += "&status=" + filtre;
+      if (filtreAgent) url += "&assignee=" + filtreAgent;
+
+      let reponse;
+      try {
+        reponse = await api("GET", url);
+      } catch (err) {
+        afficherToast(err.message, true);
+        return;
+      }
+      const total = Number(reponse.headers.get("X-Total-Count")) || 0;
+      const demandes = await reponse.json();
+      const nbPages = Math.max(1, Math.ceil(total / PAR_PAGE));
+
+      // Si la page courante est devenue vide (ex : après une suppression), on recule
+      if (demandes.length === 0 && page > 1) {
+        page = nbPages;
+        return chargerListe();
+      }
+
+      $("total").textContent = total + (total > 1 ? " demandes" : " demande");
+      let titre = FILTRES[filtre] || (moi.role === "employe" ? "Mes demandes" : "Demandes enregistrées");
+      if (filtreAgent === "me") titre += " · à traiter par moi";
+      if (filtreAgent === "none") titre += " · non assignées";
+      $("titre-liste").textContent = titre;
+
+      afficherListe(demandes);
+
+      $("pagination").style.display = nbPages > 1 ? "flex" : "none";
+      $("info-page").textContent = "Page " + page + " / " + nbPages;
+      $("precedent").disabled = page <= 1;
+      $("suivant").disabled = page >= nbPages;
+    }
+
+    $("precedent").addEventListener("click", () => { page--; chargerListe(); });
+    $("suivant").addEventListener("click", () => { page++; chargerListe(); });
+
+    function majFiltres() {
+      for (const c of document.querySelectorAll(".compteur")) c.classList.toggle("actif", c.dataset.statut === filtre);
+      for (const p of document.querySelectorAll(".puce")) p.classList.toggle("actif", p.dataset.assignee === filtreAgent);
+    }
+
+    // Cliquer sur un compteur filtre la liste ; recliquer enlève le filtre
+    for (const c of document.querySelectorAll(".compteur")) {
+      c.addEventListener("click", () => {
+        filtre = filtre === c.dataset.statut ? "" : c.dataset.statut;
+        page = 1;
+        majFiltres();
+        chargerListe();
+      });
+    }
+    for (const p of document.querySelectorAll(".puce")) {
+      p.addEventListener("click", () => {
+        filtreAgent = p.dataset.assignee;
+        page = 1;
+        majFiltres();
+        chargerListe();
+      });
+    }
+
+    function petitBouton(texte, classe, action) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn-icone " + (classe || "");
+      b.textContent = texte;
+      b.addEventListener("click", action);
+      return b;
     }
 
     function afficherListe(demandes) {
-      const liste = document.getElementById("liste");
+      const liste = $("liste");
       liste.innerHTML = "";
 
       if (demandes.length === 0) {
-        liste.innerHTML =
-          '<div class="vide"><span class="icone">📭</span>Aucune demande pour le moment.</div>';
+        liste.innerHTML = (filtre || filtreAgent)
+          ? '<div class="vide"><span class="icone">🔍</span>Aucune demande avec ces filtres.</div>'
+          : '<div class="vide"><span class="icone">📭</span>Aucune demande pour le moment.</div>';
         return;
       }
 
-      // Les plus récentes en premier
-      for (const d of [...demandes].reverse()) {
+      for (const d of demandes) {
         const carte = document.createElement("div");
         carte.className = "demande " + d.status;
 
         const haut = document.createElement("div");
         haut.className = "demande-haut";
-
         const titre = document.createElement("h3");
         titre.textContent = d.title;
-
         const badge = document.createElement("span");
         badge.className = "badge " + d.status;
         badge.textContent = LIBELLES[d.status] || d.status;
-
         haut.append(titre, badge);
         carte.appendChild(haut);
 
@@ -393,54 +1068,213 @@
           carte.appendChild(desc);
         }
 
+        // Qui traite la demande ?
+        const traitant = document.createElement("div");
+        traitant.className = "traitant";
+        if (d.assignee_name) {
+          traitant.append("🛠️ Traitée par ");
+          const nom = document.createElement("strong");
+          nom.textContent = d.assignee_id === moi.id ? "vous" : d.assignee_name;
+          traitant.appendChild(nom);
+        } else {
+          traitant.textContent = "⏳ Pas encore prise en charge";
+        }
+        carte.appendChild(traitant);
+
         const meta = document.createElement("div");
         meta.className = "meta";
-        const date = new Date(d.created_at).toLocaleString("fr-FR", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        });
+        const date = new Date(d.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
         meta.innerHTML = "<span></span><span></span><span></span>";
         meta.children[0].textContent = "#" + d.id;
         meta.children[1].textContent = "👤 " + d.requester;
         meta.children[2].textContent = "🕒 " + date;
-        // Menu pour changer le statut
-        const select = document.createElement("select");
-        select.className = "select-statut";
-        for (const [valeur, libelle] of Object.entries(LIBELLES)) {
-          const option = document.createElement("option");
-          option.value = valeur;
-          option.textContent = libelle;
-          option.selected = valeur === d.status;
-          select.appendChild(option);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+        const estAMoi = d.requester_id === moi.id;
+        const libre = d.assignee_id === null;
+        const assigneeAMoi = d.assignee_id === moi.id;
+
+        // Statut : admin toujours ; agent si la demande est libre ou à lui
+        if (moi.role === "admin" || (moi.role === "agent" && (libre || assigneeAMoi))) {
+          const select = document.createElement("select");
+          select.className = "select-statut";
+          select.setAttribute("aria-label", "Statut de la demande #" + d.id);
+          for (const [valeur, libelle] of Object.entries(LIBELLES)) {
+            const option = document.createElement("option");
+            option.value = valeur;
+            option.textContent = libelle;
+            option.selected = valeur === d.status;
+            select.appendChild(option);
+          }
+          select.addEventListener("change", () => changerStatut(d.id, select.value));
+          meta.appendChild(select);
         }
-        select.addEventListener("change", () => changerStatut(d.id, select.value));
-        meta.appendChild(select);
 
+        // Assignation
+        if (moi.role === "admin") {
+          const choix = document.createElement("select");
+          choix.className = "petit";
+          choix.setAttribute("aria-label", "Agent de la demande #" + d.id);
+          choix.add(new Option("— Non assignée —", ""));
+          for (const a of agents) choix.add(new Option("🛠️ " + a.name, a.id, false, a.id === d.assignee_id));
+          choix.addEventListener("change", () => assigner(d.id, choix.value ? Number(choix.value) : null));
+          actions.appendChild(choix);
+        } else if (moi.role === "agent" && libre) {
+          actions.appendChild(petitBouton("✋ Prendre en charge", "btn-prendre", () => assigner(d.id, moi.id)));
+        } else if (moi.role === "agent" && assigneeAMoi && d.status !== "done") {
+          actions.appendChild(petitBouton("↩️ Libérer", "", () => assigner(d.id, null)));
+        }
+
+        // Modifier / supprimer : admin, ou demandeur tant que personne ne l'a prise en charge
+        if (moi.role === "admin" || (estAMoi && d.status === "open" && libre)) {
+          actions.appendChild(petitBouton("✏️ Modifier", "", () => commencerEdition(d)));
+          actions.appendChild(petitBouton("🗑️ Supprimer", "danger", () => supprimerDemande(d)));
+        }
+
+        if (actions.children.length) meta.appendChild(actions);
         carte.appendChild(meta);
-
         liste.appendChild(carte);
       }
     }
 
-    // Changement de statut -> PATCH /requests/{id}
     async function changerStatut(id, statut) {
-      const reponse = await fetch("/requests/" + id, {
-        method: "PATCH",
-        body: JSON.stringify({ status: statut }),
-      });
-      if (!reponse.ok) {
-        alert(await reponse.text());
+      try {
+        await api("PATCH", "/requests/" + id, { status: statut });
+        afficherToast("Statut mis à jour ✓");
+      } catch (err) {
+        afficherToast(err.message, true);
       }
-      chargerListe();
+      chargerTout();
     }
 
-    function afficherToast() {
-      const toast = document.getElementById("toast");
+    async function assigner(id, agentId) {
+      try {
+        await api("PATCH", "/requests/" + id + "/assign", { assignee_id: agentId });
+        afficherToast(agentId ? "Demande assignée ✓" : "Demande libérée ✓");
+      } catch (err) {
+        afficherToast(err.message, true);
+      }
+      chargerTout();
+    }
+
+    async function supprimerDemande(d) {
+      if (!confirm("Supprimer la demande « " + d.title + " » ? Cette action est définitive.")) return;
+      try {
+        await api("DELETE", "/requests/" + d.id);
+        if (enEdition && enEdition.id === d.id) quitterEdition();
+        afficherToast("Demande supprimée ✓");
+      } catch (err) {
+        afficherToast(err.message, true);
+      }
+      chargerTout();
+    }
+
+    // ---------- Utilisateurs (admin) ----------
+
+    async function chargerAgents() {
+      try {
+        const tous = await (await api("GET", "/users")).json();
+        agents = tous.filter((u) => u.role === "agent" || u.role === "admin");
+      } catch (_) { agents = []; }
+    }
+
+    async function chargerUtilisateurs() {
+      let users;
+      try {
+        users = await (await api("GET", "/users")).json();
+      } catch (err) {
+        afficherToast(err.message, true);
+        return;
+      }
+      agents = users.filter((u) => u.role === "agent" || u.role === "admin");
+      $("total-users").textContent = users.length + (users.length > 1 ? " comptes" : " compte");
+
+      const liste = $("liste-users");
+      liste.innerHTML = "";
+      for (const u of users) {
+        const ligne = document.createElement("div");
+        ligne.className = "ligne-user";
+
+        const infos = document.createElement("div");
+        infos.className = "infos";
+        const nom = document.createElement("strong");
+        nom.textContent = u.name + (u.id === moi.id ? " (vous)" : "");
+        const email = document.createElement("small");
+        email.textContent = u.email;
+        infos.append(nom, email);
+        ligne.appendChild(infos);
+
+        const role = document.createElement("select");
+        role.className = "petit";
+        role.setAttribute("aria-label", "Rôle de " + u.name);
+        for (const [valeur, libelle] of Object.entries(ROLES)) role.add(new Option(libelle, valeur, false, valeur === u.role));
+        role.disabled = u.id === moi.id;
+        role.addEventListener("change", async () => {
+          try {
+            await api("PATCH", "/users/" + u.id, { role: role.value });
+            afficherToast("Rôle mis à jour ✓");
+          } catch (err) {
+            afficherToast(err.message, true);
+          }
+          chargerUtilisateurs();
+        });
+        ligne.appendChild(role);
+
+        if (u.id !== moi.id) {
+          ligne.appendChild(petitBouton("🗑️", "danger", async () => {
+            if (!confirm("Supprimer le compte de " + u.name + " ? Ses demandes sont gardées.")) return;
+            try {
+              await api("DELETE", "/users/" + u.id);
+              afficherToast("Compte supprimé ✓");
+            } catch (err) {
+              afficherToast(err.message, true);
+            }
+            chargerUtilisateurs();
+          }));
+        }
+        liste.appendChild(ligne);
+      }
+    }
+
+    $("form-user").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      cacher($("erreur-user"));
+      try {
+        await api("POST", "/users", {
+          name: $("nouveau-nom").value.trim(),
+          email: $("nouveau-email").value.trim(),
+          password: $("nouveau-mdp").value,
+          role: $("nouveau-role").value,
+        });
+        $("form-user").reset();
+        afficherToast("Compte créé ✓");
+        chargerUtilisateurs();
+      } catch (err) {
+        afficherErreur($("erreur-user"), err);
+      }
+    });
+
+    // ---------- Divers ----------
+
+    let minuteurToast;
+    function afficherToast(texte, estErreur = false) {
+      const toast = $("toast");
+      toast.textContent = texte;
+      toast.style.background = estErreur ? "var(--erreur)" : "var(--termine)";
       toast.classList.add("visible");
-      setTimeout(() => toast.classList.remove("visible"), 2500);
+      clearTimeout(minuteurToast);
+      minuteurToast = setTimeout(() => toast.classList.remove("visible"), 3000);
     }
 
-    chargerListe();
+    // Au chargement : déjà connecté ?
+    (async () => {
+      try {
+        const reponse = await fetch("/auth/me");
+        if (reponse.ok) return demarrer(await reponse.json());
+      } catch (_) {}
+      afficherConnexion();
+    })();
   </script>
 </body>
 </html>

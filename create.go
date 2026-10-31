@@ -1,20 +1,19 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
 
-// POST /requests : créer une demande
-func createRequest(w http.ResponseWriter, r *http.Request) {
+// POST /requests : créer une demande (tout utilisateur connecté).
+// Le demandeur est l'utilisateur connecté : on ne lit pas "requester" dans le corps.
+func createRequest(w http.ResponseWriter, r *http.Request, u User) {
 	var req Request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrors(w, http.StatusBadRequest, map[string]string{
-			"general": "Les données envoyées sont invalides.",
-		})
+	if !decodeJSON(w, r, &req) {
 		return
 	}
+	req.Requester = u.Name
 
 	// Contrôle de saisie : un message par champ en erreur
 	if errs := cleanAndValidate(&req); len(errs) > 0 {
@@ -22,14 +21,11 @@ func createRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.Status = StatusOpen
-	req.CreatedAt = time.Now()
-	req.UpdatedAt = req.CreatedAt
-
+	now := time.Now()
 	result, err := db.Exec(
-		`INSERT INTO requests (title, description, requester, status, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		req.Title, req.Description, req.Requester, req.Status, req.CreatedAt, req.UpdatedAt,
+		`INSERT INTO requests (title, description, requester, requester_id, status, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		req.Title, req.Description, req.Requester, u.ID, StatusOpen, now, now,
 	)
 	if err != nil {
 		writeErrors(w, http.StatusInternalServerError, map[string]string{
@@ -37,8 +33,15 @@ func createRequest(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	id, _ := result.LastInsertId()
-	req.ID = int(id)
+	id64, _ := result.LastInsertId()
+	id := int(id64)
 
-	writeJSON(w, http.StatusCreated, req)
+	notifyProcessors(u.ID, &id, fmt.Sprintf("Nouvelle demande #%d « %s » de %s.", id, req.Title, u.Name))
+
+	created, err := getRequest(id)
+	if err != nil {
+		serverError(w)
+		return
+	}
+	writeJSON(w, http.StatusCreated, created)
 }
