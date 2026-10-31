@@ -415,6 +415,7 @@
     }
     .ecran-connexion[hidden], main[hidden], .vue[hidden] { display: none; }
     .bascule { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem; background: var(--bg); padding: .25rem; border-radius: 12px; margin-bottom: 1.25rem; }
+    .bascule[hidden] { display: none; }
     .bascule button { background: none; color: var(--texte-doux); padding: .55rem; }
     .bascule button:hover { background: var(--bordure); }
     .bascule button.actif { background: var(--carte); color: var(--texte); box-shadow: var(--ombre); }
@@ -498,6 +499,83 @@
     .form-reponse textarea { min-height: 42px; height: 42px; font-size: .88rem; padding: .5rem .7rem; }
     .form-reponse button { width: auto; padding: .55rem .9rem; font-size: .85rem; flex-shrink: 0; }
 
+    /* ---------- Priorité, catégorie, fichiers, historique ---------- */
+    .deux-champs { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .champ-select {
+      width: 100%;
+      font: inherit;
+      color: var(--texte);
+      background: var(--bg);
+      border: 1.5px solid var(--bordure);
+      border-radius: 10px;
+      padding: .6rem .6rem;
+    }
+    input[type=file] { padding: .45rem; font-size: .82rem; }
+    .outils-liste { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .etiquettes { display: flex; gap: .35rem; flex-wrap: wrap; margin-top: .35rem; }
+    .etiquette {
+      font-size: .7rem;
+      font-weight: 700;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      background: var(--bg);
+      color: var(--texte-doux);
+      border: 1px solid var(--bordure);
+    }
+    .etiquette.urgent { background: var(--erreur-fond); color: var(--erreur); border-color: transparent; }
+    .etiquette.low { color: var(--termine); }
+    .demande.prio-urgent { box-shadow: inset 0 0 0 1px var(--erreur); }
+    .panneau-demande {
+      margin-top: .8rem;
+      padding-top: .8rem;
+      border-top: 1px dashed var(--bordure);
+    }
+    .panneau-demande[hidden] { display: none; }
+    .panneau-demande h4 { font-size: .8rem; color: var(--texte-doux); margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .04em; }
+    .fichiers { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
+    .fichier {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      border: 1px solid var(--bordure);
+      border-radius: 10px;
+      padding: .35rem .5rem;
+      font-size: .8rem;
+      max-width: 100%;
+    }
+    .fichier img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; background: var(--bg); }
+    .fichier .icone-pdf { width: 44px; height: 44px; display: grid; place-items: center; font-size: 1.4rem; background: var(--bg); border-radius: 6px; }
+    .fichier a { color: var(--texte); font-weight: 600; text-decoration: none; word-break: break-all; }
+    .fichier a:hover { text-decoration: underline; }
+    .fichier small { display: block; color: var(--texte-doux); font-weight: normal; }
+    .fichier .btn-icone { padding: .15rem .35rem; }
+    .chronologie { list-style: none; border-left: 2px solid var(--bordure); margin-left: .35rem; padding-left: 1rem; }
+    .chronologie li { position: relative; font-size: .84rem; margin-bottom: .55rem; }
+    .chronologie li::before {
+      content: "";
+      position: absolute;
+      left: calc(-1rem - 6px);
+      top: .35rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primaire);
+    }
+    .chronologie small { display: block; color: var(--texte-doux); font-size: .72rem; }
+    .message-info {
+      display: none;
+      background: var(--termine-fond);
+      color: var(--termine);
+      border-radius: 10px;
+      padding: .6rem .8rem;
+      font-size: .85rem;
+      margin-bottom: 1rem;
+    }
+    #titre-auth { font-size: 1.1rem; margin-bottom: 1rem; }
+    .lien-reset { display: flex; gap: .5rem; margin: .75rem 0; }
+    .lien-reset input { font-size: .8rem; }
+    .lien-reset button { width: auto; flex-shrink: 0; padding: .5rem .8rem; }
+
     /* ---------- Fenêtre mot de passe ---------- */
     dialog {
       border: 1px solid var(--bordure);
@@ -555,26 +633,29 @@
   <!-- ========== Connexion / inscription ========== -->
   <section class="ecran-connexion" id="ecran-connexion" hidden>
     <div class="carte">
-      <div class="bascule">
+      <div class="bascule" id="bascule">
         <button type="button" class="actif" id="mode-connexion">Se connecter</button>
         <button type="button" id="mode-inscription">Créer un compte</button>
       </div>
+      <h2 id="titre-auth" hidden></h2>
+      <div id="info-auth" class="message-info" role="status"></div>
       <div id="erreur-auth" class="message-erreur" role="alert"></div>
       <form id="form-auth">
         <div class="champ" id="champ-nom" hidden>
           <label for="auth-nom">Nom complet</label>
           <input id="auth-nom" autocomplete="name" maxlength="50" placeholder="Ex : Aminata Diallo">
         </div>
-        <div class="champ">
+        <div class="champ" id="champ-email">
           <label for="auth-email">E-mail</label>
           <input id="auth-email" type="email" autocomplete="email" required placeholder="vous@exemple.com">
         </div>
-        <div class="champ">
-          <label for="auth-mdp">Mot de passe</label>
+        <div class="champ" id="champ-mdp">
+          <label for="auth-mdp" id="label-mdp">Mot de passe</label>
           <input id="auth-mdp" type="password" autocomplete="current-password" required minlength="8" maxlength="128" placeholder="8 caractères minimum">
         </div>
         <button type="submit" id="btn-auth">Se connecter</button>
       </form>
+      <p class="aide"><button type="button" class="lien" id="lien-oubli">Mot de passe oublié ?</button><button type="button" class="lien" id="lien-retour" hidden>← Retour à la connexion</button></p>
       <p class="aide" id="aide-auth">Les nouveaux comptes sont des comptes employés. Un administrateur peut ensuite vous donner le rôle d'agent.</p>
     </div>
   </section>
@@ -598,6 +679,24 @@
           <label for="description">Description</label>
           <textarea id="description" placeholder="Détails (optionnel)" maxlength="500"></textarea>
         </div>
+        <div class="deux-champs">
+          <div class="champ">
+            <label for="priority">Priorité</label>
+            <select id="priority" class="champ-select">
+              <option value="low">🟢 Basse</option>
+              <option value="normal" selected>🟡 Normale</option>
+              <option value="urgent">🔴 Urgente</option>
+            </select>
+          </div>
+          <div class="champ">
+            <label for="category">Catégorie</label>
+            <select id="category" class="champ-select"></select>
+          </div>
+        </div>
+        <div class="champ" id="champ-fichiers">
+          <label for="fichiers">Pièces jointes (images ou PDF, 5 Mo max, 5 fichiers)</label>
+          <input id="fichiers" type="file" multiple accept="image/png,image/jpeg,image/gif,image/webp,application/pdf">
+        </div>
         <button type="submit" id="bouton">Envoyer la demande</button>
       </form>
     </section>
@@ -613,6 +712,22 @@
         <button type="button" class="puce actif" data-assignee="">Toutes</button>
         <button type="button" class="puce" data-assignee="me">Mes demandes à traiter (<span id="n-mine">0</span>)</button>
         <button type="button" class="puce" data-assignee="none">Non assignées</button>
+      </div>
+
+      <div class="outils-liste">
+        <select id="filtre-priorite" class="petit" aria-label="Filtrer par priorité">
+          <option value="">Toutes priorités</option>
+          <option value="urgent">🔴 Urgentes</option>
+          <option value="normal">🟡 Normales</option>
+          <option value="low">🟢 Basses</option>
+        </select>
+        <select id="filtre-categorie" class="petit" aria-label="Filtrer par catégorie">
+          <option value="">Toutes catégories</option>
+        </select>
+        <select id="tri" class="petit" aria-label="Trier">
+          <option value="recent">Plus récentes d'abord</option>
+          <option value="priority">Urgentes d'abord</option>
+        </select>
       </div>
 
       <div class="entete-liste">
@@ -690,12 +805,31 @@
     </form>
   </dialog>
 
+  <!-- Fenêtre : lien de réinitialisation (admin) -->
+  <dialog id="dialog-lien">
+    <h2 style="font-size:1.1rem;margin-bottom:.5rem">Lien de réinitialisation</h2>
+    <p style="font-size:.88rem;color:var(--texte-doux)">Envoyez ce lien à <strong id="lien-pour"></strong> (WhatsApp, SMS…). Il permet de choisir un nouveau mot de passe, une seule fois, jusqu'au <span id="lien-expire"></span>.</p>
+    <div class="lien-reset">
+      <input id="lien-url" readonly aria-label="Lien de réinitialisation">
+      <button type="button" id="copier-lien">Copier</button>
+    </div>
+    <div class="boutons"><button type="button" class="secondaire" id="fermer-lien">Fermer</button></div>
+  </dialog>
+
   <div class="toast" id="toast"></div>
 
   <script>
     const LIBELLES = { open: "Ouverte", in_progress: "En cours", done: "Terminée" };
     const FILTRES = { open: "Demandes ouvertes", in_progress: "Demandes en cours", done: "Demandes terminées" };
     const ROLES = { employe: "Employé", agent: "Agent", admin: "Administrateur" };
+    const PRIORITES = { urgent: "🔴 Urgente", normal: "🟡 Normale", low: "🟢 Basse" };
+    const CATEGORIES = {
+      informatique: "💻 Informatique",
+      materiel: "📦 Matériel et fournitures",
+      rh: "👥 Ressources humaines",
+      logistique: "🏢 Logistique et locaux",
+      autre: "📝 Autre",
+    };
     const PAR_PAGE = 5;
     const $ = (id) => document.getElementById(id);
 
@@ -708,6 +842,8 @@
     let enEdition = null;    // demande en cours de modification
     let minuteurNotifs = null;
     const filsOuverts = new Set(); // demandes dont le fil de réponses est ouvert
+    const fichiersOuverts = new Set();
+    const historiquesOuverts = new Set();
 
     // ---------- Appels au serveur ----------
 
@@ -759,30 +895,80 @@
 
     // ---------- Connexion / inscription ----------
 
-    let modeInscription = false;
+    // Quatre écrans : connexion, inscription, mot de passe oublié,
+    // et nouveau mot de passe (quand on arrive avec un lien ?reset=…)
+    let modeAuth = "connexion";
+    let jetonReset = new URLSearchParams(location.search).get("reset");
 
-    function choisirMode(inscription) {
-      modeInscription = inscription;
-      $("mode-connexion").classList.toggle("actif", !inscription);
-      $("mode-inscription").classList.toggle("actif", inscription);
-      $("champ-nom").hidden = !inscription;
-      $("auth-nom").required = inscription;
-      $("auth-mdp").autocomplete = inscription ? "new-password" : "current-password";
-      $("btn-auth").textContent = inscription ? "Créer mon compte" : "Se connecter";
+    function choisirMode(mode) {
+      modeAuth = mode;
+      const simple = mode === "oubli" || mode === "reset";
+      $("bascule").hidden = simple;
+      $("titre-auth").hidden = !simple;
+      $("titre-auth").textContent = mode === "oubli" ? "Mot de passe oublié" : "Choisir un nouveau mot de passe";
+      $("mode-connexion").classList.toggle("actif", mode === "connexion");
+      $("mode-inscription").classList.toggle("actif", mode === "inscription");
+      $("champ-nom").hidden = mode !== "inscription";
+      $("auth-nom").required = mode === "inscription";
+      $("champ-email").hidden = mode === "reset";
+      $("auth-email").required = mode !== "reset";
+      $("champ-mdp").hidden = mode === "oubli";
+      $("auth-mdp").required = mode !== "oubli";
+      $("label-mdp").textContent = mode === "reset" ? "Nouveau mot de passe" : "Mot de passe";
+      $("auth-mdp").autocomplete = mode === "connexion" ? "current-password" : "new-password";
+      $("btn-auth").textContent = {
+        connexion: "Se connecter",
+        inscription: "Créer mon compte",
+        oubli: "Prévenir un administrateur",
+        reset: "Enregistrer le nouveau mot de passe",
+      }[mode];
+      $("lien-oubli").hidden = mode !== "connexion";
+      $("lien-retour").hidden = mode === "connexion" || mode === "inscription";
+      $("aide-auth").hidden = mode !== "inscription";
       cacher($("erreur-auth"));
     }
-    $("mode-connexion").addEventListener("click", () => choisirMode(false));
-    $("mode-inscription").addEventListener("click", () => choisirMode(true));
+    $("mode-connexion").addEventListener("click", () => { choisirMode("connexion"); cacher($("info-auth")); });
+    $("mode-inscription").addEventListener("click", () => { choisirMode("inscription"); cacher($("info-auth")); });
+    $("lien-oubli").addEventListener("click", () => {
+      choisirMode("oubli");
+      montrerInfo("Indiquez votre e-mail : un administrateur sera prévenu et vous enverra un lien pour choisir un nouveau mot de passe.");
+    });
+    $("lien-retour").addEventListener("click", () => {
+      jetonReset = null;
+      history.replaceState(null, "", "/");
+      choisirMode("connexion");
+      cacher($("info-auth"));
+    });
+
+    function montrerInfo(texte) {
+      $("info-auth").textContent = texte;
+      $("info-auth").style.display = "block";
+    }
 
     $("form-auth").addEventListener("submit", async (e) => {
       e.preventDefault();
       cacher($("erreur-auth"));
       $("btn-auth").disabled = true;
       try {
+        if (modeAuth === "oubli") {
+          await api("POST", "/auth/forgot", { email: $("auth-email").value.trim() });
+          montrerInfo("C'est noté. Si un compte existe avec cet e-mail, un administrateur a été prévenu : il vous enverra un lien de réinitialisation.");
+          return;
+        }
+        if (modeAuth === "reset") {
+          await api("POST", "/auth/reset", { token: jetonReset, password: $("auth-mdp").value });
+          jetonReset = null;
+          history.replaceState(null, "", "/");
+          $("form-auth").reset();
+          choisirMode("connexion");
+          montrerInfo("Mot de passe changé ✓ Vous pouvez maintenant vous connecter.");
+          return;
+        }
         const donnees = { email: $("auth-email").value.trim(), password: $("auth-mdp").value };
-        if (modeInscription) donnees.name = $("auth-nom").value.trim();
-        const reponse = await api("POST", modeInscription ? "/auth/register" : "/auth/login", donnees);
+        if (modeAuth === "inscription") donnees.name = $("auth-nom").value.trim();
+        const reponse = await api("POST", modeAuth === "inscription" ? "/auth/register" : "/auth/login", donnees);
         $("form-auth").reset();
+        cacher($("info-auth"));
         demarrer(await reponse.json());
       } catch (err) {
         afficherErreur($("erreur-auth"), err);
@@ -792,6 +978,7 @@
     });
 
     function afficherConnexion() {
+      choisirMode(jetonReset ? "reset" : "connexion");
       moi = null;
       clearInterval(minuteurNotifs);
       $("app").hidden = true;
@@ -940,16 +1127,34 @@
       const donnees = {
         title: $("title").value.trim(),
         description: $("description").value.trim(),
+        priority: $("priority").value,
+        category: $("category").value,
       };
+      const fichiers = [...$("fichiers").files];
+      if (fichiers.length > 5) {
+        afficherErreur($("erreur"), new Error("5 pièces jointes maximum par demande."));
+        $("bouton").disabled = false;
+        $("bouton").textContent = enEdition ? "Enregistrer les modifications" : "Envoyer la demande";
+        return;
+      }
 
       try {
         if (enEdition) {
           await api("PUT", "/requests/" + enEdition.id, donnees);
           afficherToast("Demande modifiée ✓");
         } else {
-          await api("POST", "/requests", donnees);
-          afficherToast("Demande enregistrée ✓");
+          const creee = await (await api("POST", "/requests", donnees)).json();
           page = 1;
+          // Les pièces jointes sont envoyées une par une, après la création
+          const refus = [];
+          for (const f of fichiers) {
+            try { await envoyerFichier(creee.id, f); } catch (err) { refus.push(f.name + " : " + err.message); }
+          }
+          if (refus.length) {
+            afficherToast("Demande enregistrée, mais fichier refusé — " + refus.join(" / "), true);
+          } else {
+            afficherToast("Demande enregistrée ✓");
+          }
         }
         quitterEdition();
         chargerTout();
@@ -965,6 +1170,9 @@
       enEdition = d;
       $("title").value = d.title;
       $("description").value = d.description || "";
+      $("priority").value = d.priority;
+      $("category").value = d.category;
+      $("champ-fichiers").hidden = true; // en modification, on ajoute les fichiers depuis la demande
       $("titre-form").textContent = "Modifier la demande #" + d.id;
       $("bouton").textContent = "Enregistrer les modifications";
       $("annuler").hidden = false;
@@ -977,6 +1185,7 @@
     function quitterEdition() {
       enEdition = null;
       $("formulaire").reset();
+      $("champ-fichiers").hidden = false;
       $("titre-form").textContent = "Nouvelle demande";
       $("bouton").textContent = "Envoyer la demande";
       $("annuler").hidden = true;
@@ -1007,6 +1216,9 @@
       let url = "/requests?page=" + page + "&limit=" + PAR_PAGE;
       if (filtre) url += "&status=" + filtre;
       if (filtreAgent) url += "&assignee=" + filtreAgent;
+      if ($("filtre-priorite").value) url += "&priority=" + $("filtre-priorite").value;
+      if ($("filtre-categorie").value) url += "&category=" + $("filtre-categorie").value;
+      url += "&sort=" + $("tri").value;
 
       let reponse;
       try {
@@ -1039,6 +1251,9 @@
       $("suivant").disabled = page >= nbPages;
     }
 
+    for (const id of ["filtre-priorite", "filtre-categorie", "tri"]) {
+      $(id).addEventListener("change", () => { page = 1; chargerListe(); });
+    }
     $("precedent").addEventListener("click", () => { page--; chargerListe(); });
     $("suivant").addEventListener("click", () => { page++; chargerListe(); });
 
@@ -1079,7 +1294,7 @@
       liste.innerHTML = "";
 
       if (demandes.length === 0) {
-        liste.innerHTML = (filtre || filtreAgent)
+        liste.innerHTML = (filtre || filtreAgent || $("filtre-priorite").value || $("filtre-categorie").value)
           ? '<div class="vide"><span class="icone">🔍</span>Aucune demande avec ces filtres.</div>'
           : '<div class="vide"><span class="icone">📭</span>Aucune demande pour le moment.</div>';
         return;
@@ -1087,7 +1302,7 @@
 
       for (const d of demandes) {
         const carte = document.createElement("div");
-        carte.className = "demande " + d.status;
+        carte.className = "demande " + d.status + (d.priority === "urgent" && d.status !== "done" ? " prio-urgent" : "");
 
         const haut = document.createElement("div");
         haut.className = "demande-haut";
@@ -1105,6 +1320,18 @@
           desc.textContent = d.description;
           carte.appendChild(desc);
         }
+
+        // Priorité et catégorie
+        const etiquettes = document.createElement("div");
+        etiquettes.className = "etiquettes";
+        const prio = document.createElement("span");
+        prio.className = "etiquette " + d.priority;
+        prio.textContent = PRIORITES[d.priority] || d.priority;
+        const cat = document.createElement("span");
+        cat.className = "etiquette";
+        cat.textContent = CATEGORIES[d.category] || d.category;
+        etiquettes.append(prio, cat);
+        carte.appendChild(etiquettes);
 
         // Qui traite la demande ?
         const traitant = document.createElement("div");
@@ -1147,6 +1374,13 @@
           }
           select.addEventListener("change", () => changerStatut(d.id, select.value));
           meta.appendChild(select);
+
+          const choixPrio = document.createElement("select");
+          choixPrio.className = "petit";
+          choixPrio.setAttribute("aria-label", "Priorité de la demande #" + d.id);
+          for (const [valeur, libelle] of Object.entries(PRIORITES)) choixPrio.add(new Option(libelle, valeur, false, valeur === d.priority));
+          choixPrio.addEventListener("change", () => changerPriorite(d.id, choixPrio.value));
+          actions.appendChild(choixPrio);
         }
 
         // Assignation
@@ -1176,13 +1410,28 @@
         fil.hidden = !filsOuverts.has(d.id);
         const btnReponses = petitBouton("💬 Réponses (" + d.comment_count + ")",
           "btn-reponses" + (d.comment_count > 0 ? " non-vide" : ""), () => basculerFil(d, fil));
-        actions.prepend(btnReponses);
+
+        // Pièces jointes et historique
+        const panFichiers = document.createElement("div");
+        panFichiers.className = "panneau-demande";
+        panFichiers.hidden = !fichiersOuverts.has(d.id);
+        const btnFichiers = petitBouton("📎 Fichiers (" + d.attachment_count + ")",
+          "btn-reponses" + (d.attachment_count > 0 ? " non-vide" : ""),
+          () => basculerPanneau(fichiersOuverts, d, panFichiers, chargerFichiers));
+        const panHisto = document.createElement("div");
+        panHisto.className = "panneau-demande";
+        panHisto.hidden = !historiquesOuverts.has(d.id);
+        const btnHisto = petitBouton("🕓 Historique", "",
+          () => basculerPanneau(historiquesOuverts, d, panHisto, chargerHistorique));
+        actions.prepend(btnReponses, btnFichiers, btnHisto);
 
         meta.appendChild(actions);
         carte.appendChild(meta);
-        carte.appendChild(fil);
+        carte.append(fil, panFichiers, panHisto);
         liste.appendChild(carte);
         if (!fil.hidden) chargerFil(d, fil);
+        if (!panFichiers.hidden) chargerFichiers(d, panFichiers);
+        if (!panHisto.hidden) chargerHistorique(d, panHisto);
       }
     }
 
@@ -1218,6 +1467,165 @@
       chargerTout();
     }
 
+
+
+    async function changerPriorite(id, priorite) {
+      try {
+        await api("PATCH", "/requests/" + id, { priority: priorite });
+        afficherToast("Priorité mise à jour ✓");
+      } catch (err) {
+        afficherToast(err.message, true);
+      }
+      chargerListe();
+    }
+
+    function basculerPanneau(ouverts, d, panneau, charger) {
+      panneau.hidden = !panneau.hidden;
+      if (panneau.hidden) {
+        ouverts.delete(d.id);
+      } else {
+        ouverts.add(d.id);
+        charger(d, panneau);
+      }
+    }
+
+    // ---------- Pièces jointes ----------
+
+    // envoyerFichier envoie un fichier (formulaire multipart) ; lève une erreur lisible si refusé
+    async function envoyerFichier(idDemande, fichier) {
+      if (fichier.size > 5 * 1024 * 1024) throw new Error("trop gros (5 Mo maximum)");
+      const corps = new FormData();
+      corps.append("file", fichier);
+      const reponse = await fetch("/requests/" + idDemande + "/attachments", {
+        method: "POST",
+        headers: { "X-Requested-With": "fetch" },
+        body: corps,
+      });
+      if (!reponse.ok) {
+        let message = "Erreur " + reponse.status;
+        try {
+          const data = await reponse.json();
+          if (data.errors) message = Object.values(data.errors).join(" ");
+        } catch (_) {}
+        throw new Error(message);
+      }
+      return reponse.json();
+    }
+
+    function taille(octets) {
+      return octets < 1024 * 1024 ? Math.max(1, Math.round(octets / 1024)) + " Ko" : (octets / 1024 / 1024).toFixed(1) + " Mo";
+    }
+
+    async function chargerFichiers(d, panneau) {
+      let fichiers;
+      try {
+        fichiers = await (await api("GET", "/requests/" + d.id + "/attachments")).json();
+      } catch (err) {
+        panneau.textContent = err.message;
+        return;
+      }
+      panneau.innerHTML = "<h4>Pièces jointes</h4>";
+      const liste = document.createElement("div");
+      liste.className = "fichiers";
+      if (fichiers.length === 0) {
+        const vide = document.createElement("p");
+        vide.className = "fil-vide";
+        vide.textContent = "Aucune pièce jointe.";
+        panneau.appendChild(vide);
+      }
+      for (const f of fichiers) {
+        const bloc = document.createElement("div");
+        bloc.className = "fichier";
+        const url = "/attachments/" + f.id;
+        if (f.content_type.startsWith("image/")) {
+          const img = document.createElement("img");
+          img.src = url;
+          img.alt = f.filename;
+          img.loading = "lazy";
+          bloc.appendChild(img);
+        } else {
+          const icone = document.createElement("span");
+          icone.className = "icone-pdf";
+          icone.textContent = "📄";
+          bloc.appendChild(icone);
+        }
+        const infos = document.createElement("div");
+        const lien = document.createElement("a");
+        lien.href = url;
+        lien.target = "_blank";
+        lien.rel = "noopener";
+        lien.textContent = f.filename;
+        const detail = document.createElement("small");
+        detail.textContent = taille(f.size) + " · " + (f.uploader_id === moi.id ? "vous" : f.uploader);
+        infos.append(lien, detail);
+        bloc.appendChild(infos);
+        if (moi.role === "admin" || f.uploader_id === moi.id) {
+          bloc.appendChild(petitBouton("🗑️", "danger", async () => {
+            if (!confirm("Supprimer « " + f.filename + " » ?")) return;
+            try {
+              await api("DELETE", url);
+              afficherToast("Fichier supprimé ✓");
+            } catch (err) {
+              afficherToast(err.message, true);
+            }
+            chargerListe();
+          }));
+        }
+        liste.appendChild(bloc);
+      }
+      panneau.appendChild(liste);
+
+      if (fichiers.length < 5) {
+        const ajout = document.createElement("input");
+        ajout.type = "file";
+        ajout.accept = "image/png,image/jpeg,image/gif,image/webp,application/pdf";
+        ajout.setAttribute("aria-label", "Ajouter une pièce jointe à la demande #" + d.id);
+        ajout.addEventListener("change", async () => {
+          const f = ajout.files[0];
+          if (!f) return;
+          ajout.disabled = true;
+          try {
+            await envoyerFichier(d.id, f);
+            afficherToast("Fichier ajouté ✓");
+          } catch (err) {
+            afficherToast(f.name + " : " + err.message, true);
+          }
+          chargerListe();
+        });
+        panneau.appendChild(ajout);
+      }
+    }
+
+    // ---------- Historique ----------
+
+    async function chargerHistorique(d, panneau) {
+      let evenements;
+      try {
+        evenements = await (await api("GET", "/requests/" + d.id + "/history")).json();
+      } catch (err) {
+        panneau.textContent = err.message;
+        return;
+      }
+      panneau.innerHTML = "<h4>Historique</h4>";
+      const ul = document.createElement("ul");
+      ul.className = "chronologie";
+      for (const ev of evenements) {
+        const li = document.createElement("li");
+        const qui = document.createElement("strong");
+        qui.textContent = ev.actor_name;
+        li.append(qui, " " + ev.message);
+        const quand = document.createElement("small");
+        quand.textContent = new Date(ev.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+        li.appendChild(quand);
+        ul.appendChild(li);
+      }
+      if (evenements.length === 0) {
+        const li = document.createElement("li");
+        li.textContent = "Aucun événement enregistré (demande créée avant l'historique).";
+        ul.appendChild(li);
+      }
+      panneau.appendChild(ul);
+    }
 
     // ---------- Fil des réponses d'une demande ----------
 
@@ -1343,6 +1751,9 @@
         ligne.appendChild(role);
 
         if (u.id !== moi.id) {
+          const cle = petitBouton("🔑", "", () => genererLienReset(u));
+          cle.title = "Générer un lien pour réinitialiser le mot de passe de " + u.name;
+          ligne.appendChild(cle);
           ligne.appendChild(petitBouton("🗑️", "danger", async () => {
             if (!confirm("Supprimer le compte de " + u.name + " ? Ses demandes sont gardées.")) return;
             try {
@@ -1357,6 +1768,33 @@
         liste.appendChild(ligne);
       }
     }
+
+
+    // Lien de réinitialisation du mot de passe, à transmettre à l'utilisateur
+    async function genererLienReset(u) {
+      if (!confirm("Générer un lien de réinitialisation pour " + u.name + " ? Un ancien lien éventuel ne marchera plus.")) return;
+      try {
+        const data = await (await api("POST", "/users/" + u.id + "/reset-link")).json();
+        $("lien-pour").textContent = u.name;
+        $("lien-expire").textContent = new Date(data.expires_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+        $("lien-url").value = location.origin + data.path;
+        $("copier-lien").textContent = "Copier";
+        $("dialog-lien").showModal();
+        $("lien-url").select();
+      } catch (err) {
+        afficherToast(err.message, true);
+      }
+    }
+    $("copier-lien").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($("lien-url").value);
+      } catch (_) {
+        $("lien-url").select();
+        document.execCommand("copy");
+      }
+      $("copier-lien").textContent = "Copié ✓";
+    });
+    $("fermer-lien").addEventListener("click", () => $("dialog-lien").close());
 
     $("form-user").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1388,8 +1826,18 @@
       minuteurToast = setTimeout(() => toast.classList.remove("visible"), 3000);
     }
 
-    // Au chargement : déjà connecté ?
+    for (const [valeur, libelle] of Object.entries(CATEGORIES)) {
+      $("category").add(new Option(libelle, valeur, valeur === "autre", valeur === "autre"));
+      $("filtre-categorie").add(new Option(libelle, valeur));
+    }
+
+    // Au chargement : lien de réinitialisation, ou déjà connecté ?
     (async () => {
+      if (jetonReset) {
+        afficherConnexion();
+        choisirMode("reset");
+        return;
+      }
       try {
         const reponse = await fetch("/auth/me");
         if (reponse.ok) return demarrer(await reponse.json());

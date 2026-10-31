@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -539,4 +541,276 @@ func TestReponses(t *testing.T) {
 	if n != 0 {
 		t.Errorf("%d réponses restantes après suppression", n)
 	}
+}
+
+// ---------- Priorité et catégorie ----------
+
+func TestPrioriteEtCategorie(t *testing.T) {
+	e := setup(t)
+
+	// Valeurs par défaut
+	r := decode[Request](t, e.alice.expect(http.StatusCreated, "POST", "/requests", `{"title":"Souris"}`))
+	if r.Priority != PriorityNormal || r.Category != "autre" {
+		t.Errorf("valeurs par défaut : %s / %s", r.Priority, r.Category)
+	}
+	e.alice.expect(http.StatusBadRequest, "POST", "/requests", `{"title":"Ecran","priority":"tres urgent"}`)
+	e.alice.expect(http.StatusBadRequest, "POST", "/requests", `{"title":"Ecran","category":"cuisine"}`)
+
+	urgent := decode[Request](t, e.alice.expect(http.StatusCreated, "POST", "/requests",
+		`{"title":"Serveur en panne","priority":"urgent","category":"informatique"}`))
+	if urgent.Priority != PriorityUrgent || urgent.Category != "informatique" {
+		t.Errorf("demande urgente : %+v", urgent)
+	}
+	create(e.alice, "Clavier") // normale, plus récente
+
+	// Les agents sont prévenus que c'est urgent
+	n := decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.agent.expect(http.StatusOK, "GET", "/notifications", ""))
+	found := false
+	for _, it := range n.Items {
+		if strings.Contains(it.Message, "URGENT") && strings.Contains(it.Message, "Serveur en panne") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("la notification d'une demande urgente devrait le dire")
+	}
+
+	// Tri par priorité : l'urgente d'abord, même si elle est plus ancienne
+	list := decode[[]Request](t, e.agent.expect(http.StatusOK, "GET", "/requests?sort=priority", ""))
+	if list[0].ID != urgent.ID {
+		t.Errorf("tri par priorité : la première est %q", list[0].Title)
+	}
+	if list := decode[[]Request](t, e.agent.expect(http.StatusOK, "GET", "/requests", "")); list[0].Title != "Clavier" {
+		t.Errorf("tri par défaut : la plus récente d'abord, pas %q", list[0].Title)
+	}
+
+	// Filtres
+	if l := decode[[]Request](t, e.agent.expect(http.StatusOK, "GET", "/requests?priority=urgent", "")); len(l) != 1 {
+		t.Errorf("filtre priorité : %d", len(l))
+	}
+	if l := decode[[]Request](t, e.agent.expect(http.StatusOK, "GET", "/requests?category=informatique", "")); len(l) != 1 {
+		t.Errorf("filtre catégorie : %d", len(l))
+	}
+	for _, url := range []string{"/requests?priority=x", "/requests?category=x", "/requests?sort=x"} {
+		e.agent.expect(http.StatusBadRequest, "GET", url, "")
+	}
+
+	// Le demandeur change la catégorie tant que personne n'a pris la demande
+	r = decode[Request](t, e.alice.expect(http.StatusOK, "PUT", "/requests/"+itoa(r.ID),
+		`{"title":"Souris","category":"materiel"}`))
+	if r.Category != "materiel" || r.Priority != PriorityNormal {
+		t.Errorf("modification : %+v (la priorité non envoyée doit rester)", r)
+	}
+
+	// Un agent change la priorité ; un employé ne peut pas
+	e.alice.expect(http.StatusForbidden, "PATCH", "/requests/"+itoa(r.ID), `{"priority":"urgent"}`)
+	r = decode[Request](t, e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(r.ID), `{"priority":"low"}`))
+	if r.Priority != PriorityLow || r.Status != StatusOpen {
+		t.Errorf("changement de priorité : %+v", r)
+	}
+	e.agent.expect(http.StatusBadRequest, "PATCH", "/requests/"+itoa(r.ID), `{"priority":"x"}`)
+	e.agent.expect(http.StatusBadRequest, "PATCH", "/requests/"+itoa(r.ID), `{}`)
+}
+
+// ---------- Historique ----------
+
+func TestHistorique(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Clavier")
+	url := "/requests/" + itoa(id)
+
+	e.alice.expect(http.StatusOK, "PUT", url, `{"title":"Clavier sans fil","description":"Pour le bureau","priority":"urgent"}`)
+	e.alice.expect(http.StatusOK, "PUT", url, `{"title":"Clavier sans fil","description":"Pour le bureau","priority":"urgent"}`) // rien ne change
+	e.admin.expect(http.StatusOK, "PATCH", url+"/assign", `{"assignee_id":`+itoa(e.agentID)+`}`)
+	e.admin.expect(http.StatusOK, "PATCH", url+"/assign", `{"assignee_id":`+itoa(e.agentID)+`}`) // déjà assignée
+	e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"in_progress"}`)
+	e.agent.expect(http.StatusOK, "PATCH", url+"/assign", `{"assignee_id":null}`)
+	e.agent.expect(http.StatusOK, "PATCH", url, `{"status":"done","priority":"normal"}`)
+
+	events := decode[[]Event](t, e.alice.expect(http.StatusOK, "GET", url+"/history", ""))
+	want := []string{
+		"Alice:a créé la demande",
+		"Alice:a modifié la demande (titre : « Clavier » → « Clavier sans fil », priorité : normale → urgente)",
+		"Awa Admin:a assigné la demande à Moussa Agent",
+		"Moussa Agent:a changé le statut : ouverte → en cours",
+		"Moussa Agent:a libéré la demande",
+		"Moussa Agent:a pris la demande en charge",
+		"Moussa Agent:a changé le statut : en cours → terminée",
+		"Moussa Agent:a changé la priorité : urgente → normale",
+	}
+	if len(events) != len(want) {
+		for _, ev := range events {
+			t.Log(ev.ActorName, ":", ev.Message)
+		}
+		t.Fatalf("%d lignes d'historique, attendu %d", len(events), len(want))
+	}
+	for i, w := range want {
+		got := events[i].ActorName + ":" + events[i].Message
+		if !strings.HasPrefix(got, w) {
+			t.Errorf("ligne %d : %q, attendu %q", i, got, w)
+		}
+	}
+
+	e.bob.expect(http.StatusNotFound, "GET", url+"/history", "")
+}
+
+// ---------- Pièces jointes ----------
+
+// Un petit PNG valide (1 pixel)
+var pngData = []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82")
+
+func (c *client) upload(code int, url, filename string, data []byte) *httptest.ResponseRecorder {
+	c.t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", filename)
+	fw.Write(data)
+	mw.Close()
+
+	req := httptest.NewRequest("POST", url, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("X-Requested-With", "fetch")
+	if c.cookie != nil {
+		req.AddCookie(c.cookie)
+	}
+	rec := httptest.NewRecorder()
+	c.h.ServeHTTP(rec, req)
+	if rec.Code != code {
+		c.t.Errorf("upload %s : code %d, attendu %d (%s)", filename, rec.Code, code, strings.TrimSpace(rec.Body.String()))
+	}
+	return rec
+}
+
+func TestPiecesJointes(t *testing.T) {
+	e := setup(t)
+	id := create(e.alice, "Ecran casse")
+	url := "/requests/" + itoa(id) + "/attachments"
+
+	a := decode[Attachment](t, e.alice.upload(http.StatusCreated, url, `../../photo "écran".jpeg`, pngData))
+	if a.ContentType != "image/png" || a.Filename != "photo écran.png" || a.Size != len(pngData) {
+		t.Errorf("pièce jointe : %+v (le type et l'extension viennent du contenu)", a)
+	}
+
+	// Refusés : faux type, fichier vide, trop gros
+	e.alice.upload(http.StatusBadRequest, url, "virus.png", []byte("MZ\x90\x00 ceci est un exe"))
+	e.alice.upload(http.StatusBadRequest, url, "page.html", []byte("<html><script>alert(1)</script></html>"))
+	e.alice.upload(http.StatusBadRequest, url, "vide.png", nil)
+	big := append(append([]byte{}, pngData...), make([]byte, maxFileSize)...)
+	e.alice.upload(http.StatusBadRequest, url, "gros.png", big)
+
+	// Le demandeur est notifié quand l'équipe ajoute un fichier
+	e.admin.upload(http.StatusCreated, url, "devis.pdf", []byte("%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"))
+	if n := decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.alice.expect(http.StatusOK, "GET", "/notifications", "")); !strings.Contains(n.Items[0].Message, "pièce jointe") {
+		t.Errorf("notification : %+v", n.Items)
+	}
+
+	// Liste et compteur
+	list := decode[[]Attachment](t, e.agent.expect(http.StatusOK, "GET", url, ""))
+	if len(list) != 2 {
+		t.Fatalf("%d pièces jointes, attendu 2", len(list))
+	}
+	if r, _ := getRequest(id); r.FileCount != 2 {
+		t.Errorf("attachment_count = %d", r.FileCount)
+	}
+
+	// Téléchargement : image affichée, PDF téléchargé, en-têtes de sécurité
+	rec := e.alice.expect(http.StatusOK, "GET", "/attachments/"+itoa(a.ID), "")
+	if !bytes.Equal(rec.Body.Bytes(), pngData) || rec.Header().Get("Content-Type") != "image/png" ||
+		!strings.HasPrefix(rec.Header().Get("Content-Disposition"), "inline") ||
+		!strings.Contains(rec.Header().Get("Content-Security-Policy"), "sandbox") {
+		t.Errorf("téléchargement de l'image : %v", rec.Header())
+	}
+	rec = e.alice.expect(http.StatusOK, "GET", "/attachments/"+itoa(list[1].ID), "")
+	if !strings.HasPrefix(rec.Header().Get("Content-Disposition"), "attachment") {
+		t.Error("un PDF doit être téléchargé, pas affiché")
+	}
+
+	// Bob ne voit ni la liste ni les fichiers, et ne peut rien ajouter
+	e.bob.expect(http.StatusNotFound, "GET", url, "")
+	e.bob.expect(http.StatusNotFound, "GET", "/attachments/"+itoa(a.ID), "")
+	e.bob.upload(http.StatusNotFound, url, "x.png", pngData)
+
+	// Suppression : celui qui l'a ajoutée ou un admin
+	e.agent.expect(http.StatusForbidden, "DELETE", "/attachments/"+itoa(a.ID), "")
+	e.alice.expect(http.StatusNoContent, "DELETE", "/attachments/"+itoa(a.ID), "")
+	e.alice.expect(http.StatusForbidden, "DELETE", "/attachments/"+itoa(list[1].ID), "")
+	e.admin.expect(http.StatusNoContent, "DELETE", "/attachments/"+itoa(list[1].ID), "")
+	e.admin.expect(http.StatusNotFound, "GET", "/attachments/"+itoa(a.ID), "")
+
+	// 5 fichiers maximum par demande
+	for i := 0; i < maxFilesPerRequest; i++ {
+		e.alice.upload(http.StatusCreated, url, "p.png", pngData)
+	}
+	e.alice.upload(http.StatusBadRequest, url, "trop.png", pngData)
+
+	// Historique
+	events := decode[[]Event](t, e.alice.expect(http.StatusOK, "GET", "/requests/"+itoa(id)+"/history", ""))
+	joined := ""
+	for _, ev := range events {
+		joined += ev.Message + "\n"
+	}
+	if !strings.Contains(joined, "a ajouté la pièce jointe « photo écran.png »") ||
+		!strings.Contains(joined, "a supprimé la pièce jointe « devis.pdf »") {
+		t.Errorf("historique :\n%s", joined)
+	}
+
+	// Supprimer la demande supprime ses fichiers
+	e.admin.expect(http.StatusNoContent, "DELETE", "/requests/"+itoa(id), "")
+	var n int
+	db.QueryRow(`SELECT COUNT(*) FROM attachments`).Scan(&n)
+	if n != 0 {
+		t.Errorf("%d fichiers restants", n)
+	}
+}
+
+// ---------- Mot de passe oublié ----------
+
+func TestMotDePasseOublie(t *testing.T) {
+	e := setup(t)
+	anon := &client{t: t, h: e.h}
+
+	// Même réponse que le compte existe ou non ; les admins sont prévenus
+	anon.expect(http.StatusNoContent, "POST", "/auth/forgot", `{"email":"alice@test.gn"}`)
+	anon.expect(http.StatusNoContent, "POST", "/auth/forgot", `{"email":"inconnu@test.gn"}`)
+	n := decode[struct {
+		Items []Notification `json:"items"`
+	}](t, e.admin.expect(http.StatusOK, "GET", "/notifications", ""))
+	if len(n.Items) != 1 || !strings.Contains(n.Items[0].Message, "Alice (alice@test.gn) a oublié son mot de passe") {
+		t.Errorf("notification admin : %+v", n.Items)
+	}
+
+	// Seul un admin génère le lien
+	e.agent.expect(http.StatusForbidden, "POST", "/users/"+itoa(e.aliceID)+"/reset-link", "")
+	e.admin.expect(http.StatusNotFound, "POST", "/users/999/reset-link", "")
+	link := decode[map[string]any](t, e.admin.expect(http.StatusCreated, "POST", "/users/"+itoa(e.aliceID)+"/reset-link", ""))
+	path, _ := link["path"].(string)
+	token := strings.TrimPrefix(path, "/?reset=")
+	if !strings.HasPrefix(path, "/?reset=") || len(token) < 40 {
+		t.Fatalf("lien inattendu : %v", link)
+	}
+
+	// Un nouveau lien annule le précédent
+	link2 := decode[map[string]any](t, e.admin.expect(http.StatusCreated, "POST", "/users/"+itoa(e.aliceID)+"/reset-link", ""))
+	anon.expect(http.StatusBadRequest, "POST", "/auth/reset", `{"token":"`+token+`","password":"nouveaumdp"}`)
+	token = strings.TrimPrefix(link2["path"].(string), "/?reset=")
+
+	anon.expect(http.StatusBadRequest, "POST", "/auth/reset", `{"token":"faux","password":"nouveaumdp"}`)
+	anon.expect(http.StatusBadRequest, "POST", "/auth/reset", `{"token":"`+token+`","password":"court"}`)
+	anon.expect(http.StatusNoContent, "POST", "/auth/reset", `{"token":"`+token+`","password":"nouveaumdp"}`)
+
+	// Le lien ne sert qu'une fois, les anciennes sessions sont fermées, le nouveau mot de passe marche
+	anon.expect(http.StatusBadRequest, "POST", "/auth/reset", `{"token":"`+token+`","password":"autremdp1"}`)
+	e.alice.expect(http.StatusUnauthorized, "GET", "/auth/me", "")
+	anon.expect(http.StatusUnauthorized, "POST", "/auth/login", `{"email":"alice@test.gn","password":"motdepasse"}`)
+	anon.expect(http.StatusOK, "POST", "/auth/login", `{"email":"alice@test.gn","password":"nouveaumdp"}`)
+
+	// Lien expiré
+	link3 := decode[map[string]any](t, e.admin.expect(http.StatusCreated, "POST", "/users/"+itoa(e.aliceID)+"/reset-link", ""))
+	db.Exec(`UPDATE password_resets SET expires_at = ?`, time.Now().Add(-time.Minute))
+	anon.expect(http.StatusBadRequest, "POST", "/auth/reset",
+		`{"token":"`+strings.TrimPrefix(link3["path"].(string), "/?reset=")+`","password":"nouveaumdp2"}`)
 }

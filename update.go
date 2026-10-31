@@ -6,9 +6,10 @@ import (
 	"time"
 )
 
-// PATCH /requests/{id} : changer le statut d'une demande (agents et admins).
+// PATCH /requests/{id} : changer le statut et/ou la priorité d'une demande (agents et admins).
+// Corps : {"status": "in_progress"}, {"priority": "urgent"} ou les deux.
 // Un agent ne peut traiter que les demandes libres ou qui lui sont assignées ;
-// s'il change le statut d'une demande libre, elle lui est assignée.
+// s'il change une demande libre, elle lui est assignée.
 func updateStatus(w http.ResponseWriter, r *http.Request, u User) {
 	current, ok := loadVisibleRequest(w, r, u)
 	if !ok {
@@ -16,16 +17,36 @@ func updateStatus(w http.ResponseWriter, r *http.Request, u User) {
 	}
 
 	var body struct {
-		Status Status `json:"status"`
+		Status   *Status   `json:"status"`
+		Priority *Priority `json:"priority"`
 	}
 	if !decodeJSON(w, r, &body) {
 		return
 	}
-	if !body.Status.valid() {
+	if body.Status == nil && body.Priority == nil {
 		writeErrors(w, http.StatusBadRequest, map[string]string{
-			"general": "Statut invalide : choisissez ouverte, en cours ou terminée.",
+			"general": "Indiquez un statut ou une priorité.",
 		})
 		return
+	}
+	newStatus, newPriority := current.Status, current.Priority
+	if body.Status != nil {
+		if !body.Status.valid() {
+			writeErrors(w, http.StatusBadRequest, map[string]string{
+				"general": "Statut invalide : choisissez ouverte, en cours ou terminée.",
+			})
+			return
+		}
+		newStatus = *body.Status
+	}
+	if body.Priority != nil {
+		if !body.Priority.valid() {
+			writeErrors(w, http.StatusBadRequest, map[string]string{
+				"general": "Priorité invalide : basse, normale ou urgente.",
+			})
+			return
+		}
+		newPriority = *body.Priority
 	}
 
 	assignee := current.AssigneeID
@@ -40,19 +61,28 @@ func updateStatus(w http.ResponseWriter, r *http.Request, u User) {
 	}
 
 	if _, err := db.Exec(
-		`UPDATE requests SET status = ?, assignee_id = ?, updated_at = ? WHERE id = ?`,
-		body.Status, assignee, time.Now(), current.ID,
+		`UPDATE requests SET status = ?, priority = ?, assignee_id = ?, updated_at = ? WHERE id = ?`,
+		newStatus, newPriority, assignee, time.Now(), current.ID,
 	); err != nil {
 		writeErrors(w, http.StatusInternalServerError, map[string]string{
-			"general": "Erreur du serveur : le statut n'a pas pu être modifié.",
+			"general": "Erreur du serveur : la demande n'a pas pu être modifiée.",
 		})
 		return
 	}
 
-	if body.Status != current.Status {
+	if current.AssigneeID == nil && assignee != nil {
+		logEvent(current.ID, u, "a pris la demande en charge")
+	}
+	if newStatus != current.Status {
+		logEvent(current.ID, u, fmt.Sprintf("a changé le statut : %s → %s",
+			statusLabels[current.Status], statusLabels[newStatus]))
 		notifyUnlessActor(current.RequesterID, u, &current.ID, fmt.Sprintf(
 			"Votre demande #%d « %s » est maintenant %s (par %s).",
-			current.ID, current.Title, statusLabels[body.Status], u.Name))
+			current.ID, current.Title, statusLabels[newStatus], u.Name))
+	}
+	if newPriority != current.Priority {
+		logEvent(current.ID, u, fmt.Sprintf("a changé la priorité : %s → %s",
+			priorityLabels[current.Priority], priorityLabels[newPriority]))
 	}
 
 	updated, err := getRequest(current.ID)
@@ -103,6 +133,13 @@ func assignRequest(w http.ResponseWriter, r *http.Request, u User) {
 		}
 	}
 
+	// Rien ne change : pas d'historique ni de notification en double
+	if (body.AssigneeID == nil && current.AssigneeID == nil) ||
+		(body.AssigneeID != nil && current.AssigneeID != nil && *body.AssigneeID == *current.AssigneeID) {
+		writeJSON(w, http.StatusOK, current)
+		return
+	}
+
 	if _, err := db.Exec(`UPDATE requests SET assignee_id = ?, updated_at = ? WHERE id = ?`,
 		body.AssigneeID, time.Now(), current.ID); err != nil {
 		serverError(w)
@@ -113,6 +150,15 @@ func assignRequest(w http.ResponseWriter, r *http.Request, u User) {
 	if err != nil {
 		serverError(w)
 		return
+	}
+
+	switch {
+	case body.AssigneeID == nil && current.AssigneeID != nil:
+		logEvent(current.ID, u, "a libéré la demande (plus personne ne la traite)")
+	case body.AssigneeID != nil && *body.AssigneeID == u.ID:
+		logEvent(current.ID, u, "a pris la demande en charge")
+	case body.AssigneeID != nil:
+		logEvent(current.ID, u, "a assigné la demande à "+deref(updated.AssigneeName))
 	}
 
 	if body.AssigneeID != nil {

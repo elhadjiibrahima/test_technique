@@ -67,6 +67,35 @@ CREATE TABLE IF NOT EXISTS comments (
 	created_at  TIMESTAMP NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
+
+CREATE TABLE IF NOT EXISTS request_events (
+	id         INTEGER PRIMARY KEY AUTOINCREMENT,
+	request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+	actor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	actor_name TEXT NOT NULL,
+	message    TEXT NOT NULL,
+	created_at TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_events_request ON request_events(request_id);
+
+CREATE TABLE IF NOT EXISTS attachments (
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	request_id   INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+	uploader_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+	uploader     TEXT NOT NULL,
+	filename     TEXT NOT NULL,
+	content_type TEXT NOT NULL,
+	size         INTEGER NOT NULL,
+	data         BLOB NOT NULL,
+	created_at   TIMESTAMP NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_request ON attachments(request_id);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+	token_hash TEXT PRIMARY KEY,
+	user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	expires_at TIMESTAMP NOT NULL
+);
 `
 
 // Colonnes ajoutées après la première version : on les ajoute aux bases
@@ -74,6 +103,8 @@ CREATE INDEX IF NOT EXISTS idx_comments_request ON comments(request_id);
 var migrations = []string{
 	`ALTER TABLE requests ADD COLUMN requester_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
 	`ALTER TABLE requests ADD COLUMN assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL`,
+	`ALTER TABLE requests ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'`,
+	`ALTER TABLE requests ADD COLUMN category TEXT NOT NULL DEFAULT 'autre'`,
 }
 
 // initDB ouvre la base et crée les tables si elles n'existent pas.

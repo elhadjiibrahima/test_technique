@@ -62,7 +62,56 @@ type Request struct {
 	Status       Status    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
-	CommentCount int       `json:"comment_count"` // nombre de réponses
+	Priority     Priority  `json:"priority"`
+	Category     Category  `json:"category"`
+	CommentCount int       `json:"comment_count"`    // nombre de réponses
+	FileCount    int       `json:"attachment_count"` // nombre de pièces jointes
+}
+
+// Priority : l'urgence d'une demande
+type Priority string
+
+const (
+	PriorityLow    Priority = "low"
+	PriorityNormal Priority = "normal"
+	PriorityUrgent Priority = "urgent"
+)
+
+var priorityLabels = map[Priority]string{
+	PriorityLow:    "basse",
+	PriorityNormal: "normale",
+	PriorityUrgent: "urgente",
+}
+
+func (p Priority) valid() bool { _, ok := priorityLabels[p]; return ok }
+
+// Category : le type de demande
+type Category string
+
+var categoryLabels = map[Category]string{
+	"informatique": "Informatique",
+	"materiel":     "Matériel et fournitures",
+	"rh":           "Ressources humaines",
+	"logistique":   "Logistique et locaux",
+	"autre":        "Autre",
+}
+
+func (c Category) valid() bool { _, ok := categoryLabels[c]; return ok }
+
+// normalizeMeta met les valeurs par défaut et vérifie priorité et catégorie
+func normalizeMeta(req *Request, errs map[string]string) {
+	if req.Priority == "" {
+		req.Priority = PriorityNormal
+	}
+	if req.Category == "" {
+		req.Category = "autre"
+	}
+	if !req.Priority.valid() {
+		errs["priority"] = "Priorité invalide : basse, normale ou urgente."
+	}
+	if !req.Category.valid() {
+		errs["category"] = "Catégorie invalide."
+	}
 }
 
 // Comment : une réponse dans le fil d'une demande

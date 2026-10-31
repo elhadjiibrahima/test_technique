@@ -32,6 +32,10 @@ func whereSQL(where []string) string {
 // Pagination (optionnelle) : ?page=2&limit=10
 // Filtres (optionnels)     : ?status=open  ?assignee=me  ?assignee=none
 //
+//	?priority=urgent  ?category=informatique
+//
+// Tri (optionnel)           : ?sort=priority (urgentes d'abord) ou ?sort=recent
+//
 // Le corps de la réponse reste une liste JSON. Le nombre total de demandes
 // (avec les filtres) est envoyé dans l'en-tête X-Total-Count.
 // Sans "page" ni "limit", toutes les demandes sont renvoyées.
@@ -47,6 +51,21 @@ func listRequests(w http.ResponseWriter, r *http.Request, u User) {
 			return
 		}
 		where, args = append(where, "r.status = ?"), append(args, s)
+	}
+
+	if p := q.Get("priority"); p != "" {
+		if !Priority(p).valid() {
+			writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Priorité invalide."})
+			return
+		}
+		where, args = append(where, "r.priority = ?"), append(args, p)
+	}
+	if c := q.Get("category"); c != "" {
+		if !Category(c).valid() {
+			writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Catégorie invalide."})
+			return
+		}
+		where, args = append(where, "r.category = ?"), append(args, c)
 	}
 
 	switch q.Get("assignee") {
@@ -68,7 +87,18 @@ func listRequests(w http.ResponseWriter, r *http.Request, u User) {
 		return
 	}
 
-	query := `SELECT ` + requestColumns + requestFrom + whereSQL(where) + ` ORDER BY r.id DESC`
+	order := ` ORDER BY r.id DESC`
+	switch q.Get("sort") {
+	case "", "recent":
+	case "priority":
+		// les urgentes d'abord, puis les plus récentes
+		order = ` ORDER BY CASE r.priority WHEN 'urgent' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, r.id DESC`
+	default:
+		writeErrors(w, http.StatusBadRequest, map[string]string{"general": "Le tri doit valoir recent ou priority."})
+		return
+	}
+
+	query := `SELECT ` + requestColumns + requestFrom + whereSQL(where) + order
 
 	if q.Has("page") || q.Has("limit") {
 		page, okPage := positiveInt(q.Get("page"), 1)

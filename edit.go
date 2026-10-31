@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const requestColumns = `r.id, r.title, r.description, r.requester, r.requester_id,
-	r.assignee_id, a.name, r.status, r.created_at, r.updated_at,
-	(SELECT COUNT(*) FROM comments c WHERE c.request_id = r.id)`
+	r.assignee_id, a.name, r.status, r.created_at, r.updated_at, r.priority, r.category,
+	(SELECT COUNT(*) FROM comments c WHERE c.request_id = r.id),
+	(SELECT COUNT(*) FROM attachments f WHERE f.request_id = r.id)`
 
 const requestFrom = ` FROM requests r LEFT JOIN users a ON a.id = r.assignee_id`
 
@@ -19,7 +21,7 @@ func scanRequest(row interface{ Scan(...any) error }) (Request, error) {
 	var req Request
 	err := row.Scan(&req.ID, &req.Title, &req.Description, &req.Requester, &req.RequesterID,
 		&req.AssigneeID, &req.AssigneeName, &req.Status, &req.CreatedAt, &req.UpdatedAt,
-		&req.CommentCount)
+		&req.Priority, &req.Category, &req.CommentCount, &req.FileCount)
 	return req, err
 }
 
@@ -64,7 +66,7 @@ func loadVisibleRequest(w http.ResponseWriter, r *http.Request, u User) (Request
 	return req, true
 }
 
-// PUT /requests/{id} : modifier le titre et la description d'une demande.
+// PUT /requests/{id} : modifier le titre, la description, la priorité et la catégorie.
 // Le statut ne change pas ici (on utilise PATCH pour ça).
 func editRequest(w http.ResponseWriter, r *http.Request, u User) {
 	current, ok := loadVisibleRequest(w, r, u)
@@ -83,23 +85,48 @@ func editRequest(w http.ResponseWriter, r *http.Request, u User) {
 		return
 	}
 	req.Requester = current.Requester // le demandeur ne change pas
+	if req.Priority == "" {
+		req.Priority = current.Priority
+	}
+	if req.Category == "" {
+		req.Category = current.Category
+	}
 
 	// Même contrôle de saisie que pour la création
-	if errs := cleanAndValidate(&req); len(errs) > 0 {
+	errs := cleanAndValidate(&req)
+	normalizeMeta(&req, errs)
+	if len(errs) > 0 {
 		writeErrors(w, http.StatusBadRequest, errs)
 		return
 	}
 
 	if _, err := db.Exec(
-		`UPDATE requests SET title = ?, description = ?, updated_at = ? WHERE id = ?`,
-		req.Title, req.Description, time.Now(), current.ID,
+		`UPDATE requests SET title = ?, description = ?, priority = ?, category = ?, updated_at = ? WHERE id = ?`,
+		req.Title, req.Description, req.Priority, req.Category, time.Now(), current.ID,
 	); err != nil {
 		serverError(w)
 		return
 	}
 
-	notifyUnlessActor(current.RequesterID, u, &current.ID,
-		fmt.Sprintf("Votre demande #%d a été modifiée par %s.", current.ID, u.Name))
+	// Historique : on note ce qui a changé
+	var changes []string
+	if req.Title != current.Title {
+		changes = append(changes, fmt.Sprintf("titre : « %s » → « %s »", current.Title, req.Title))
+	}
+	if req.Description != current.Description {
+		changes = append(changes, "description modifiée")
+	}
+	if req.Priority != current.Priority {
+		changes = append(changes, fmt.Sprintf("priorité : %s → %s", priorityLabels[current.Priority], priorityLabels[req.Priority]))
+	}
+	if req.Category != current.Category {
+		changes = append(changes, fmt.Sprintf("catégorie : %s → %s", categoryLabels[current.Category], categoryLabels[req.Category]))
+	}
+	if len(changes) > 0 {
+		logEvent(current.ID, u, "a modifié la demande ("+strings.Join(changes, ", ")+")")
+		notifyUnlessActor(current.RequesterID, u, &current.ID,
+			fmt.Sprintf("Votre demande #%d a été modifiée par %s.", current.ID, u.Name))
+	}
 
 	// On renvoie la demande complète, telle qu'elle est maintenant en base
 	updated, err := getRequest(current.ID)
