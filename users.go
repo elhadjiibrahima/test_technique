@@ -34,6 +34,7 @@ func listUsers(w http.ResponseWriter, r *http.Request, _ User) {
 			serverError(w)
 			return
 		}
+		u.Online = hub.isOnline(u.ID)
 		users = append(users, u)
 	}
 	writeJSON(w, http.StatusOK, users)
@@ -82,6 +83,7 @@ func adminCreateUser(w http.ResponseWriter, r *http.Request, _ User) {
 		serverError(w)
 		return
 	}
+	liveUsersChanged()
 	writeJSON(w, http.StatusCreated, u)
 }
 
@@ -122,6 +124,9 @@ func updateUserRole(w http.ResponseWriter, r *http.Request, admin User) {
 		db.Exec(`UPDATE requests SET assignee_id = NULL WHERE assignee_id = ?`, id)
 	}
 	notify(id, nil, "Votre rôle a été changé : vous êtes maintenant "+roleLabels[body.Role]+".")
+	hub.setRole(id, body.Role)
+	hub.sendToUser(id, liveEvent{Type: "me"})
+	liveUsersChanged()
 
 	u, err := getUser(id)
 	if err != nil {
@@ -151,6 +156,8 @@ func deleteUser(w http.ResponseWriter, r *http.Request, admin User) {
 		userNotFound(w)
 		return
 	}
+	liveLogout(id, "Votre compte a été supprimé.")
+	liveUsersChanged()
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -251,6 +258,8 @@ func adminUpdateUser(w http.ResponseWriter, r *http.Request, admin User) {
 		}
 		notify(id, nil, msg)
 	}
+	hub.sendToUser(id, liveEvent{Type: "me"})
+	liveUsersChanged()
 
 	u, err := getUser(id)
 	if err != nil {
@@ -296,7 +305,10 @@ func setUserActive(w http.ResponseWriter, r *http.Request, admin User) {
 	if !*body.Active {
 		db.Exec(`DELETE FROM sessions WHERE user_id = ?`, id)
 		db.Exec(`UPDATE requests SET assignee_id = NULL WHERE assignee_id = ? AND status != ?`, id, StatusDone)
+		liveLogout(id, "Votre compte a été désactivé par un administrateur.")
+		hub.sendTo(liveEvent{Type: "request"}, func(c *liveClient) bool { return c.role.canProcess() })
 	}
+	liveUsersChanged()
 
 	u, err := getUser(id)
 	if err != nil {

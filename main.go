@@ -46,6 +46,9 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /attachments/{id}", requireAuth(downloadAttachment))
 	mux.HandleFunc("DELETE /attachments/{id}", requireAuth(deleteAttachment))
 
+	// Temps réel (WebSocket)
+	mux.HandleFunc("GET /ws", requireAuth(liveSocket))
+
 	// Notifications
 	mux.HandleFunc("GET /notifications", requireAuth(listNotifications))
 	mux.HandleFunc("POST /notifications/read", requireAuth(markNotificationsRead))

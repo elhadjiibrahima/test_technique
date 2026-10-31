@@ -158,6 +158,7 @@ func deleteRequest(w http.ResponseWriter, r *http.Request, u User) {
 		return
 	}
 	db.Exec(`UPDATE notifications SET request_id = NULL WHERE request_id = ?`, current.ID)
+	liveRequestChanged(current.ID, current.RequesterID)
 
 	notifyUnlessActor(current.RequesterID, u, nil,
 		fmt.Sprintf("Votre demande #%d « %s » a été supprimée par %s.", current.ID, current.Title, u.Name))

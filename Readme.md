@@ -16,6 +16,7 @@ Avec la page web, on peut :
 - pour les admins : assigner les demandes, gérer les comptes (modifier, désactiver, rôles) et suivre le tableau de bord
 - noter le traitement d'une demande terminée (1 à 5 ⭐), ou la rouvrir si le problème revient
 - rechercher par mot-clé et exporter la liste en CSV (Excel)
+- tout se met à jour **en direct** (WebSocket) : nouvelles demandes, statuts, réponses, notifications, comptes
 - filtrer la liste (statut, priorité, catégorie, « mes demandes à traiter », « non assignées »),
   trier les urgentes d'abord, et la parcourir page par page
 
@@ -82,6 +83,28 @@ l'utilisateur est prévenu. Il peut aussi **désactiver** un compte, par exemple
 la personne ne peut plus se connecter, ses sessions sont fermées et ses demandes en cours sont libérées,
 mais ses demandes, ses réponses et l'historique sont gardés. Un compte désactivé peut être réactivé.
 
+## Temps réel (WebSocket)
+
+Chaque page ouverte garde une connexion WebSocket sur `/ws` (indicateur « ● En direct » sous le nom).
+Dès que quelque chose change, le serveur prévient les pages concernées, qui se mettent à jour sans recharger :
+
+- une demande est créée, modifiée, prise en charge, change de statut, reçoit une réponse ou une pièce jointe →
+  la liste, les compteurs et le tableau de bord se mettent à jour chez ceux qui voient cette demande
+  (le demandeur, les agents et les admins), et la carte modifiée clignote brièvement ;
+- une notification arrive → la cloche 🔔 se met à jour et un message s'affiche ;
+- l'admin voit qui est **en ligne** (point vert) dans la liste des utilisateurs, et les nouveaux comptes apparaissent tout seuls ;
+- un rôle change → la page de la personne s'adapte immédiatement (par exemple les filtres d'agent apparaissent) ;
+- un compte est désactivé ou supprimé, ou son mot de passe réinitialisé → la personne est déconnectée tout de suite.
+
+Si on est en train d'écrire une réponse, la mise à jour attend qu'on quitte le champ, et le brouillon est gardé.
+Si la connexion tombe (serveur redémarré, réseau coupé), la page se reconnecte toute seule, en attendant
+de plus en plus longtemps entre deux essais (jusqu'à 30 s), et vérifie les notifications toutes les 15 s en attendant.
+
+Côté serveur (`live.go`), la bibliothèque `github.com/gorilla/websocket` gère le protocole. La connexion demande
+d'être connecté, et elle est refusée si elle vient d'un autre site (vérification de l'en-tête `Origin`) :
+sinon, un site malveillant pourrait ouvrir un WebSocket avec le cookie de l'utilisateur. Un ping toutes les
+25 secondes garde la connexion ouverte chez les hébergeurs qui coupent les connexions inactives.
+
 ## Mot de passe oublié
 
 Le site n'envoie pas encore d'e-mails, donc la réinitialisation passe par un administrateur :
@@ -141,6 +164,7 @@ go test -v ./...
 - `feedback.go` : rouvrir et noter une demande
 - `export.go` : l'export CSV
 - `dashboard.go` : les chiffres du tableau de bord
+- `live.go` : le temps réel (WebSocket)
 - `model.go` : les structures (demande, utilisateur), les statuts et les rôles
 - `database.go` : la connexion à la base SQLite et la création des tables
 - `create.go` : ajouter une demande
@@ -203,6 +227,9 @@ Utilisateurs (admin) :
 - `PUT /users/{id}` : modifier la fiche d'un utilisateur
 - `PATCH /users/{id}/active` : désactiver (`{"active": false}`) ou réactiver un compte
 
+Temps réel :
+- `GET /ws` : connexion WebSocket (messages `notification`, `request`, `users`, `presence`, `me`, `logout`)
+
 Tableau de bord (admin) :
 - `GET /stats/dashboard` : tous les chiffres du tableau de bord
 
@@ -241,6 +268,8 @@ J'ai fait des tests automatiques pour vérifier, entre autres, que :
 - la recherche trouve dans les réponses et par numéro, traite % comme un caractère normal, et respecte la visibilité
 - l'export CSV respecte les filtres et la visibilité, et neutralise les formules
 - les chiffres du tableau de bord (délai moyen, satisfaction, semaines, agents) sont justes
+- le WebSocket refuse les visiteurs non connectés et les autres sites, envoie chaque événement aux bonnes
+  personnes seulement (présence, notifications, demandes, rôle, déconnexion) ; les tests passent aussi avec `go test -race`
 - la pagination et les filtres marchent, et refusent les mauvais paramètres
 
 Pour les tests, j'utilise une base de données en mémoire. Comme ça, mes vraies données ne sont pas touchées.

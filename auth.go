@@ -383,6 +383,9 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u, err := createUser(c.Name, c.Email, c.Password, RoleEmploye, c.JobTitle)
+	if err == nil {
+		liveUsersChanged()
+	}
 	if errors.Is(err, errEmailTaken) {
 		writeErrors(w, http.StatusConflict, map[string]string{
 			"email": "Un compte existe déjà avec cet e-mail.",

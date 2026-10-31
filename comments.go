@@ -86,6 +86,7 @@ func addComment(w http.ResponseWriter, r *http.Request, u User) {
 
 	// La demande a bougé : on met à jour sa date
 	db.Exec(`UPDATE requests SET updated_at = ? WHERE id = ?`, c.CreatedAt, req.ID)
+	liveRequestChanged(req.ID, req.RequesterID)
 
 	extrait := excerpt(c.Message, 80)
 	if isOwner(u, req) {

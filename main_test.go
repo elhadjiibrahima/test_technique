@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // ---------- Outils de test ----------
@@ -50,9 +52,9 @@ func (c *client) expect(code int, method, url, body string) *httptest.ResponseRe
 }
 
 type env struct {
-	h                                http.Handler
-	admin, agent, agent2, alice, bob *client
-	agentID, agent2ID, aliceID       int
+	h                                 http.Handler
+	admin, agent, agent2, alice, bob  *client
+	agentID, agent2ID, aliceID, bobID int
 }
 
 // setup prépare une base vide en mémoire pour chaque test (les vraies données
@@ -80,7 +82,7 @@ func setup(t *testing.T) *env {
 	e.agent, e.agentID = mk("Moussa Agent", "agent@test.gn", RoleAgent)
 	e.agent2, e.agent2ID = mk("Fanta Agent", "agent2@test.gn", RoleAgent)
 	e.alice, e.aliceID = mk("Alice", "alice@test.gn", RoleEmploye)
-	e.bob, _ = mk("Bob", "bob@test.gn", RoleEmploye)
+	e.bob, e.bobID = mk("Bob", "bob@test.gn", RoleEmploye)
 	return e
 }
 
@@ -1151,5 +1153,183 @@ func TestTableauDeBord(t *testing.T) {
 	}
 	if d.Agents[0].Name != "Moussa Agent" || d.Agents[0].Done != 2 || *d.Agents[0].AvgRating != 4 {
 		t.Errorf("agents : %+v", d.Agents[0])
+	}
+}
+
+// ---------- Temps réel (WebSocket) ----------
+
+// wsDial ouvre une connexion temps réel avec le cookie de ce client
+func wsDial(t *testing.T, srv *httptest.Server, c *client, origin string) (*websocket.Conn, *http.Response, error) {
+	t.Helper()
+	h := http.Header{}
+	h.Set("Origin", origin)
+	if c != nil && c.cookie != nil {
+		h.Set("Cookie", c.cookie.Name+"="+c.cookie.Value)
+	}
+	return websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http")+"/ws", h)
+}
+
+// wsConn : une connexion de test dont les messages sont lus en arrière-plan
+// (avec gorilla, un délai de lecture dépassé casse la connexion : on ne lit donc
+// jamais avec un délai, on attend sur un canal).
+type wsConn struct {
+	*websocket.Conn
+	events  chan liveEvent
+	pending []liveEvent
+}
+
+func wsWatch(conn *websocket.Conn) *wsConn {
+	w := &wsConn{Conn: conn, events: make(chan liveEvent, 100)}
+	go func() {
+		for {
+			var ev liveEvent
+			if err := conn.ReadJSON(&ev); err != nil {
+				close(w.events)
+				return
+			}
+			w.events <- ev
+		}
+	}()
+	return w
+}
+
+// wsNext attend un message du type voulu, quel que soit l'ordre d'arrivée :
+// les messages d'autres types reçus entre-temps sont gardés pour les appels suivants.
+func wsNext(t *testing.T, w *wsConn, typ string, match ...func(liveEvent) bool) liveEvent {
+	t.Helper()
+	ok := func(ev liveEvent) bool {
+		if ev.Type != typ {
+			return false
+		}
+		for _, m := range match {
+			if !m(ev) {
+				return false
+			}
+		}
+		return true
+	}
+	for i, ev := range w.pending {
+		if ok(ev) {
+			w.pending = append(w.pending[:i:i], w.pending[i+1:]...)
+			return ev
+		}
+	}
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case ev, open := <-w.events:
+			if !open {
+				t.Fatalf("connexion fermée avant le message %q", typ)
+			}
+			if ok(ev) {
+				return ev
+			}
+			w.pending = append(w.pending, ev)
+		case <-timeout:
+			t.Fatalf("pas de message %q reçu", typ)
+		}
+	}
+}
+
+// wsNone vérifie qu'aucun message du type donné n'arrive pendant un court instant
+func wsNone(t *testing.T, w *wsConn, typ string) {
+	t.Helper()
+	timeout := time.After(300 * time.Millisecond)
+	for {
+		for _, ev := range w.pending {
+			if ev.Type == typ {
+				t.Errorf("message %q inattendu : %+v", typ, ev)
+			}
+		}
+		w.pending = nil
+		select {
+		case ev, open := <-w.events:
+			if !open {
+				return
+			}
+			w.pending = append(w.pending, ev)
+		case <-timeout:
+			return
+		}
+	}
+}
+
+// wsOpen ouvre une connexion temps réel pour ce client et la surveille
+func wsOpen(t *testing.T, srv *httptest.Server, c *client) *wsConn {
+	t.Helper()
+	conn, _, err := wsDial(t, srv, c, srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	return wsWatch(conn)
+}
+
+func TestTempsReel(t *testing.T) {
+	e := setup(t)
+	srv := httptest.NewServer(e.h)
+	defer srv.Close()
+
+	// Refusé sans être connecté, ou depuis un autre site
+	if _, resp, err := wsDial(t, srv, nil, srv.URL); err == nil || resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("sans connexion : %v", resp)
+	}
+	if _, resp, err := wsDial(t, srv, e.alice, "https://site-pirate.example"); err == nil || resp.StatusCode != http.StatusForbidden {
+		t.Errorf("autre origine : %v", resp)
+	}
+
+	admin := wsOpen(t, srv, e.admin)
+	agent := wsOpen(t, srv, e.agent)
+	if ev := wsNext(t, admin, "presence", func(ev liveEvent) bool { return *ev.UserID == e.agentID }); !*ev.Online {
+		t.Errorf("présence : %+v", ev)
+	}
+	alice := wsOpen(t, srv, e.alice)
+	bob := wsOpen(t, srv, e.bob)
+
+	// Les admins voient qui est en ligne
+	time.Sleep(50 * time.Millisecond)
+	for _, u := range decode[[]User](t, e.admin.expect(http.StatusOK, "GET", "/users", "")) {
+		if u.ID == e.agentID && !u.Online {
+			t.Error("l'agent devrait être en ligne")
+		}
+		if u.ID == e.agent2ID && u.Online {
+			t.Error("l'agent 2 ne devrait pas être en ligne")
+		}
+	}
+
+	// Alice crée une demande : l'agent reçoit la notification et le changement, Bob rien
+	id := create(e.alice, "Imprimante")
+	if ev := wsNext(t, agent, "notification"); !strings.Contains(ev.Message, "Imprimante") || ev.RequestID == nil || *ev.RequestID != id {
+		t.Errorf("notification de l'agent : %+v", ev)
+	}
+	if ev := wsNext(t, agent, "request"); ev.RequestID == nil || *ev.RequestID != id {
+		t.Errorf("changement : %+v", ev)
+	}
+	wsNone(t, bob, "request")
+
+	// L'agent change le statut : Alice est notifiée en direct
+	e.agent.expect(http.StatusOK, "PATCH", "/requests/"+itoa(id), `{"status":"in_progress"}`)
+	if ev := wsNext(t, alice, "notification"); !strings.Contains(ev.Message, "en cours") {
+		t.Errorf("notification d'Alice : %+v", ev)
+	}
+	wsNext(t, alice, "request")
+
+	// Une réponse met aussi la demande à jour chez Alice
+	e.agent.expect(http.StatusCreated, "POST", "/requests/"+itoa(id)+"/comments", `{"message":"J'arrive"}`)
+	wsNext(t, alice, "request")
+	wsNone(t, bob, "request")
+
+	// Changement de rôle : la page de l'utilisateur doit recharger son compte
+	e.admin.expect(http.StatusOK, "PATCH", "/users/"+itoa(e.bobID)+"", `{"role":"agent"}`)
+	wsNext(t, bob, "me")
+	wsNext(t, admin, "users")
+	// Bob, devenu agent, reçoit maintenant les changements de toutes les demandes
+	create(e.alice, "Souris")
+	wsNext(t, bob, "request")
+
+	// Désactivation : la page de l'agent est déconnectée tout de suite
+	e.admin.expect(http.StatusOK, "PATCH", "/users/"+itoa(e.agentID)+"/active", `{"active":false}`)
+	if ev := wsNext(t, agent, "logout"); !strings.Contains(ev.Message, "désactivé") {
+		t.Errorf("déconnexion : %+v", ev)
 	}
 }

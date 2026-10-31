@@ -24,6 +24,8 @@ func logEvent(requestID int, actor User, message string) {
 	if err != nil {
 		log.Println("historique non enregistré :", err)
 	}
+	// Toute action notée dans l'historique change la demande : on prévient les pages
+	liveRequestChangedByID(requestID)
 }
 
 // GET /requests/{id}/history : l'historique d'une demande, du plus ancien au plus récent

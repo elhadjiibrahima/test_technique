@@ -52,7 +52,8 @@ type User struct {
 	JobTitle  string    `json:"job_title"` // poste occupé, ex : « Comptable »
 	Phone     string    `json:"phone"`
 	Address   string    `json:"address"`
-	Active    bool      `json:"active"` // false = compte désactivé (connexion impossible)
+	Active    bool      `json:"active"`           // false = compte désactivé (connexion impossible)
+	Online    bool      `json:"online,omitempty"` // une page ouverte en ce moment (liste admin)
 }
 
 // Colonnes lues pour un utilisateur (jamais password_hash)

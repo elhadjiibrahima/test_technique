@@ -679,6 +679,15 @@
     .tableau-agents td small { display: block; color: var(--texte-doux); }
     .tableau-agents .nombre { text-align: right; }
 
+    /* ---------- Temps réel ---------- */
+    .direct { display: block; font-size: .68rem; margin-top: .2rem; opacity: .9; }
+    .direct .point { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #cbd5e1; margin-right: .3rem; vertical-align: 1px; }
+    .direct.actif .point { background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, .3); }
+    .en-ligne { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; margin-right: .35rem; vertical-align: 1px; }
+    .hors-ligne { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--bordure); margin-right: .35rem; vertical-align: 1px; }
+    .demande.flash { animation: flash 1.2s ease; }
+    @keyframes flash { 0% { background: var(--ouvert-fond); } 100% { background: transparent; } }
+
     /* ---------- Fenêtre mot de passe ---------- */
     dialog {
       border: 1px solid var(--bordure);
@@ -709,6 +718,7 @@
           <div class="qui">
             <strong id="nom-utilisateur"></strong>
             <span class="role" id="role-utilisateur"></span>
+            <span class="direct" id="direct" title="Connexion en direct"><span class="point"></span><span id="direct-texte">Connexion…</span></span>
           </div>
           <button type="button" class="btn-entete" id="btn-notifs" aria-label="Notifications">
             🔔<span class="pastille" id="pastille" hidden>0</span>
@@ -1220,6 +1230,7 @@
       choisirMode(jetonReset ? "reset" : "connexion");
       moi = null;
       clearInterval(minuteurNotifs);
+      fermerTempsReel();
       $("app").hidden = true;
       $("zone-utilisateur").hidden = true;
       $("onglets").hidden = true;
@@ -1244,8 +1255,8 @@
       // L'admin a besoin de la liste des agents avant d'afficher les demandes
       (moi.role === "admin" ? chargerAgents() : Promise.resolve()).then(() => changerVue("demandes"));
       chargerNotifications();
-      clearInterval(minuteurNotifs);
-      minuteurNotifs = setInterval(() => { chargerNotifications(); chargerCompteurs(); }, 15000);
+      demarrerSondage();
+      connecterTempsReel();
     }
 
     const peutTraiter = () => moi && (moi.role === "agent" || moi.role === "admin");
@@ -1600,7 +1611,8 @@
 
       for (const d of demandes) {
         const carte = document.createElement("div");
-        carte.className = "demande " + d.status + (d.priority === "urgent" && d.status !== "done" ? " prio-urgent" : "");
+        carte.dataset.id = d.id;
+        carte.className = (aFlasher.has(d.id) ? "flash " : "") + "demande " + d.status + (d.priority === "urgent" && d.status !== "done" ? " prio-urgent" : "");
 
         const haut = document.createElement("div");
         haut.className = "demande-haut";
@@ -1940,6 +1952,151 @@
     }
 
 
+
+    // ---------- Temps réel (WebSocket) ----------
+    // Le serveur prévient la page dès qu'une demande, une notification ou un
+    // compte change ; la page se met alors à jour toute seule. Si la connexion
+    // tombe, on se reconnecte (de plus en plus lentement), et en attendant la
+    // page vérifie les notifications toutes les 15 secondes.
+
+    let ws = null;
+    let wsDelai = 1000;
+    let wsMinuteur = null;
+    let majEnAttente = false;
+    let minuteurMaj = null;
+    let minuteurUsers = null;
+    const brouillons = new Map(); // réponses en cours d'écriture, par demande
+    const aFlasher = new Set();   // demandes mises à jour à faire clignoter
+
+    function demarrerSondage() {
+      clearInterval(minuteurNotifs);
+      minuteurNotifs = setInterval(() => { chargerNotifications(); chargerCompteurs(); }, 15000);
+    }
+
+    function etatDirect(actif) {
+      $("direct").classList.toggle("actif", actif);
+      $("direct-texte").textContent = actif ? "En direct" : "Reconnexion…";
+      $("direct").title = actif ? "Les mises à jour arrivent en direct" : "Connexion en direct perdue : nouvelle tentative en cours";
+    }
+
+    function connecterTempsReel() {
+      fermerTempsReel();
+      if (!moi) return;
+      const socket = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+      ws = socket;
+      socket.onopen = () => {
+        wsDelai = 1000;
+        etatDirect(true);
+        clearInterval(minuteurNotifs); // plus besoin de vérifier régulièrement
+        // On a pu rater des changements pendant la coupure : on resynchronise
+        chargerNotifications();
+        planifierMaj();
+      };
+      socket.onmessage = (e) => {
+        let ev;
+        try { ev = JSON.parse(e.data); } catch (_) { return; }
+        recevoir(ev);
+      };
+      socket.onclose = () => {
+        if (ws !== socket) return; // fermeture voulue
+        ws = null;
+        if (!moi) return;
+        etatDirect(false);
+        demarrerSondage();
+        wsMinuteur = setTimeout(connecterTempsReel, wsDelai);
+        wsDelai = Math.min(wsDelai * 2, 30000);
+      };
+    }
+
+    function fermerTempsReel() {
+      clearTimeout(wsMinuteur);
+      if (ws) {
+        const s = ws;
+        ws = null;
+        s.close();
+      }
+    }
+
+    function recevoir(ev) {
+      switch (ev.type) {
+        case "notification":
+          chargerNotifications();
+          afficherToast("🔔 " + ev.message);
+          break;
+        case "request":
+          if (ev.request_id) aFlasher.add(ev.request_id);
+          planifierMaj();
+          break;
+        case "users":
+        case "presence":
+          clearTimeout(minuteurUsers);
+          minuteurUsers = setTimeout(() => {
+            if (moi && moi.role === "admin") {
+              if (!document.querySelector('.vue[data-vue="utilisateurs"]').hidden) chargerUtilisateurs();
+              else if (ev.type === "users") chargerAgents().then(planifierMaj);
+            }
+          }, 300);
+          break;
+        case "me":
+          rafraichirMoi();
+          break;
+        case "logout":
+          afficherConnexion();
+          afficherErreur($("erreur-auth"), new Error(ev.message || "Vous avez été déconnecté."));
+          break;
+      }
+    }
+
+    // planifierMaj regroupe les changements reçus en une seule mise à jour.
+    // Si l'utilisateur est en train d'écrire dans la liste (réponse, note…),
+    // on attend qu'il ait fini pour ne pas lui retirer le champ sous les doigts.
+    function planifierMaj() {
+      clearTimeout(minuteurMaj);
+      minuteurMaj = setTimeout(appliquerMaj, 250);
+    }
+    function appliquerMaj() {
+      if (!moi) return;
+      const actif = document.activeElement;
+      if (actif && $("liste").contains(actif) && (actif.tagName === "TEXTAREA" || (actif.tagName === "INPUT" && actif.type !== "file"))) {
+        majEnAttente = true;
+        return;
+      }
+      majEnAttente = false;
+      const vue = document.querySelector(".vue:not([hidden])");
+      if (vue && vue.dataset.vue === "tableau") chargerTableau();
+      chargerCompteurs();
+      chargerListe().then(() => {
+        setTimeout(() => {
+          aFlasher.clear();
+          for (const c of document.querySelectorAll(".demande.flash")) c.classList.remove("flash");
+        }, 1300);
+      });
+    }
+    document.addEventListener("focusout", () => {
+      if (majEnAttente) setTimeout(appliquerMaj, 150);
+    });
+
+    // Mon compte a changé (rôle ou fiche modifiés par un admin)
+    async function rafraichirMoi() {
+      try {
+        const u = await (await api("GET", "/auth/me")).json();
+        const roleChange = u.role !== moi.role;
+        moi = u;
+        $("nom-utilisateur").textContent = moi.name;
+        $("role-utilisateur").textContent = ROLES[moi.role] || moi.role;
+        if (roleChange) {
+          afficherToast("Votre rôle a changé : vous êtes maintenant " + (ROLES[moi.role] || moi.role) + ".");
+          $("onglets").hidden = moi.role !== "admin";
+          $("filtres-agent").hidden = !peutTraiter();
+          filtreAgent = "";
+          majFiltres();
+          (moi.role === "admin" ? chargerAgents() : Promise.resolve()).then(() => changerVue("demandes"));
+        } else if (!document.querySelector('.vue[data-vue="profil"]').hidden) {
+          remplirProfil();
+        }
+      } catch (_) {}
+    }
+
     // ---------- Note de satisfaction ----------
 
     function etoilesTexte(n) { return "★".repeat(n) + "☆".repeat(5 - n); }
@@ -2225,6 +2382,9 @@
       zone.required = true;
       zone.placeholder = d.requester_id === moi.id ? "Répondre à l'équipe…" : "Répondre au demandeur…";
       zone.setAttribute("aria-label", "Réponse à la demande #" + d.id);
+      // Brouillon gardé si la liste se met à jour en direct pendant qu'on écrit
+      zone.value = brouillons.get(d.id) || "";
+      zone.addEventListener("input", () => brouillons.set(d.id, zone.value));
       const envoyer = document.createElement("button");
       envoyer.type = "submit";
       envoyer.textContent = "Répondre";
@@ -2235,6 +2395,7 @@
         envoyer.disabled = true;
         try {
           await api("POST", "/requests/" + d.id + "/comments", { message: zone.value });
+          brouillons.delete(d.id);
           afficherToast("Réponse envoyée ✓");
           filsOuverts.add(d.id);
           chargerListe(); // met à jour le compteur et le fil
@@ -2276,6 +2437,10 @@
         infos.className = "infos";
         const nom = document.createElement("strong");
         nom.textContent = u.name + (u.id === moi.id ? " (vous)" : "");
+        const point = document.createElement("span");
+        point.className = u.online || u.id === moi.id ? "en-ligne" : "hors-ligne";
+        point.title = u.online || u.id === moi.id ? "En ligne" : "Hors ligne";
+        nom.prepend(point);
         if (!u.active) {
           const badge = document.createElement("span");
           badge.className = "badge-inactif";

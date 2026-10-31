@@ -2,7 +2,10 @@ module test_technique
 
 go 1.27.2
 
-require modernc.org/sqlite v1.61.0
+require (
+	github.com/gorilla/websocket v1.5.3
+	modernc.org/sqlite v1.61.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect

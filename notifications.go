@@ -23,7 +23,10 @@ func notify(userID int, requestID *int, message string) {
 		userID, requestID, message, time.Now())
 	if err != nil {
 		log.Println("notification non enregistrée :", err)
+		return
 	}
+	// En direct : la cloche se met à jour tout de suite
+	hub.sendToUser(userID, liveEvent{Type: "notification", Message: message, RequestID: requestID})
 }
 
 // notifyProcessors prévient tous les agents et admins, sauf l'auteur de l'action

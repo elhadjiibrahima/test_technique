@@ -123,6 +123,7 @@ func resetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	db.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, hash, userID)
 	db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID)
+	liveLogout(userID, "Votre mot de passe a été réinitialisé : reconnectez-vous avec le nouveau.")
 
 	if u, err := getUser(userID); err == nil {
 		limiter.reset(u.Email)

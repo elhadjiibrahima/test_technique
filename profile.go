@@ -112,6 +112,7 @@ func updateProfile(w http.ResponseWriter, r *http.Request, u User) {
 		db.Exec(`UPDATE requests SET requester = ? WHERE requester_id = ?`, body.Name, u.ID)
 	}
 
+	liveUsersChanged()
 	updated, err := getUser(u.ID)
 	if err != nil {
 		serverError(w)
